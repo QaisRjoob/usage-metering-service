@@ -8,6 +8,9 @@ history for any month, and stays correct under retries and concurrent requests.
 
 It ships with an operator dashboard and an example client (the **Client Demo** page, plus a CLI).
 
+> **New here?** [docs/USER_GUIDE.md](docs/USER_GUIDE.md) explains the app in plain words and walks
+> through every page of the web interface step by step.
+
 - **Two independent parts:** [`backend/`](backend) (Fastify + PostgreSQL API) and [`frontend/`](frontend)
   (React + Vite dashboard and Client Demo). Each has its own `package.json`, lockfile, Dockerfile and
   tests; the root only holds `docker-compose.yml` and the docs.
@@ -76,6 +79,8 @@ plan assignments, history and idempotent replay of an earlier `requestId` were a
 migration check applied nothing new.
 
 ## 2. Using the example client
+
+A click-by-click tour of all pages is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ### Client Demo page (http://localhost:8080/demo)
 
