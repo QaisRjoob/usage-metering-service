@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+!.env.example
+# Non-secret: points the web app at the local API (cd frontend && npm run dev:api-mode).
+!frontend/.env.api
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Local Claude Code / editor settings
+.claude/

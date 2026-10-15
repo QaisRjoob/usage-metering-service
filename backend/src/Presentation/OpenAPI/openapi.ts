@@ -1,0 +1,240 @@
+import {
+  adminListUsageQuerySchema,
+  aiAdvisorRequestSchema,
+  assignPlanSchema,
+  consumeRequestSchema,
+  createAccountSchema,
+  createPlanSchema,
+  createUserSchema,
+  listAccountsQuerySchema,
+  listPlansQuerySchema,
+  listUsageQuerySchema,
+  listUsersQuerySchema,
+  quotaCheckRequestSchema,
+  updatePlanSchema,
+} from '../../contracts';
+import { z, type ZodObject, type ZodType } from 'zod';
+import { monthQuery, quotasQuery } from '../Schemas/params';
+
+/**
+ * OpenAPI 3.1 document served at /api/v1/openapi.json (Swagger UI at /docs).
+ * Request schemas are generated from the same zod schemas the handlers validate with, so they
+ * cannot drift. Response bodies reference the main shared shapes; the complete TypeScript types
+ * live in backend/src/contracts and are described in docs/API_CONTRACTS.md.
+ */
+type Security = 'apiKey' | 'admin' | 'either' | 'none';
+
+interface RouteDoc {
+  method: 'get' | 'post' | 'put' | 'patch';
+  path: string;
+  tag: string;
+  summary: string;
+  security: Security;
+  params?: string[];
+  query?: ZodObject;
+  body?: ZodType;
+  status?: number;
+  response: string;
+}
+
+const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+const page = (item: string) => ({ allOf: [ref('Page'), { type: 'object', properties: { items: { type: 'array', items: ref(item) } } }] });
+
+const routes: RouteDoc[] = [
+  { method: 'get', path: '/health', tag: 'Health', summary: 'Liveness', security: 'none', response: 'Status' },
+  { method: 'get', path: '/ready', tag: 'Health', summary: 'Readiness (checks PostgreSQL)', security: 'none', response: 'Status' },
+
+  { method: 'post', path: '/admin/accounts', tag: 'Operator', summary: 'Create an account; the API key is returned once', security: 'admin', body: createAccountSchema, status: 201, response: 'CreateAccountResponse' },
+  { method: 'get', path: '/admin/accounts', tag: 'Operator', summary: 'List accounts with their account quota', security: 'admin', query: listAccountsQuerySchema, response: 'Page<AccountListItem>' },
+  { method: 'get', path: '/admin/accounts/{accountId}', tag: 'Operator', summary: 'Account details for a month', security: 'admin', params: ['accountId'], query: monthQuery, response: 'Object' },
+  { method: 'get', path: '/admin/accounts/{accountId}/users', tag: 'Operator', summary: "An account's users with their quota", security: 'admin', params: ['accountId'], query: listUsersQuerySchema, response: 'Page<UserWithQuota>' },
+  { method: 'get', path: '/admin/usage', tag: 'Operator', summary: 'Request history across accounts', security: 'admin', query: adminListUsageQuerySchema, response: 'Page<UsageRecord>' },
+  { method: 'get', path: '/admin/analytics/summary', tag: 'Operator', summary: 'Dashboard metrics across accounts', security: 'admin', query: monthQuery, response: 'Object' },
+
+  { method: 'get', path: '/account', tag: 'Account', summary: 'The calling account, its plan and quota', security: 'apiKey', response: 'Object' },
+  { method: 'put', path: '/account/plan', tag: 'Account', summary: 'Assign or switch the account plan (keeps consumed units)', security: 'apiKey', body: assignPlanSchema, response: 'Object' },
+  { method: 'get', path: '/account/usage-summary', tag: 'Account', summary: 'Account usage summary for a month', security: 'apiKey', query: monthQuery, response: 'Object' },
+
+  { method: 'get', path: '/users', tag: 'Users', summary: 'List users with their individual quota', security: 'apiKey', query: listUsersQuerySchema, response: 'Page<UserWithQuota>' },
+  { method: 'post', path: '/users', tag: 'Users', summary: 'Register a user (default plan: Basic)', security: 'apiKey', body: createUserSchema, status: 201, response: 'UserWithQuota' },
+  { method: 'get', path: '/users/{userId}', tag: 'Users', summary: 'User, plan and both quota levels', security: 'apiKey', params: ['userId'], response: 'Object' },
+  { method: 'put', path: '/users/{userId}/plan', tag: 'Users', summary: "Assign or switch a user's plan (keeps consumed units)", security: 'apiKey', params: ['userId'], body: assignPlanSchema, response: 'Object' },
+  { method: 'get', path: '/users/{userId}/usage-summary', tag: 'Users', summary: 'User usage summary for a month', security: 'apiKey', params: ['userId'], query: monthQuery, response: 'Object' },
+
+  { method: 'get', path: '/plans', tag: 'Plans', summary: 'Predefined plans and the accountâ€™s custom plans', security: 'apiKey', query: listPlansQuerySchema, response: 'Page<Plan>' },
+  { method: 'post', path: '/plans', tag: 'Plans', summary: 'Create a custom plan', security: 'apiKey', body: createPlanSchema, status: 201, response: 'Plan' },
+  { method: 'get', path: '/plans/{planId}', tag: 'Plans', summary: 'Plan with all versions', security: 'apiKey', params: ['planId'], response: 'Plan' },
+  { method: 'patch', path: '/plans/{planId}', tag: 'Plans', summary: 'Update a custom plan (limit changes create a new version; predefined â†’ 403)', security: 'apiKey', params: ['planId'], body: updatePlanSchema, response: 'Plan' },
+
+  { method: 'get', path: '/quotas', tag: 'Quotas', summary: 'Account quota and a page of user quotas (current month)', security: 'apiKey', query: quotasQuery, response: 'Object' },
+  { method: 'post', path: '/quotas/check', tag: 'Quotas', summary: 'Dry run: evaluate without consuming or recording', security: 'apiKey', body: quotaCheckRequestSchema, response: 'QuotaCheckResult' },
+
+  { method: 'post', path: '/usage/consume', tag: 'Usage', summary: 'Consume units if both plans allow it (idempotent by requestId)', security: 'apiKey', body: consumeRequestSchema, response: 'ConsumeDecision' },
+  { method: 'get', path: '/usage', tag: 'Usage', summary: 'Request history (accepted and rejected), newest first', security: 'apiKey', query: listUsageQuerySchema, response: 'Page<UsageRecord>' },
+  { method: 'get', path: '/usage/{usageId}', tag: 'Usage', summary: 'One usage record', security: 'apiKey', params: ['usageId'], response: 'UsageRecord' },
+
+  { method: 'post', path: '/ai/advisor', tag: 'AI', summary: 'Ask the usage advisor (API key: one account; admin token: all accounts)', security: 'either', body: aiAdvisorRequestSchema, response: 'Object' },
+];
+
+const quotaSnapshot = {
+  type: 'object',
+  required: ['level', 'period', 'planId', 'planName', 'planVersionId', 'planVersion', 'monthlyAllowance', 'maxUnitsPerRequest', 'consumed', 'remaining', 'utilizationPercent', 'status'],
+  properties: {
+    level: { type: 'string', enum: ['account', 'user'] },
+    period: { type: 'string', example: '2026-10' },
+    planId: { type: 'string', format: 'uuid' },
+    planName: { type: 'string' },
+    planVersionId: { type: 'string', format: 'uuid' },
+    planVersion: { type: 'integer' },
+    monthlyAllowance: { type: 'integer' },
+    maxUnitsPerRequest: { type: 'integer' },
+    consumed: { type: 'integer' },
+    remaining: { type: 'integer', description: 'max(0, monthlyAllowance - consumed)' },
+    utilizationPercent: { type: 'number', description: 'Actual ratio; can exceed 100' },
+    status: { type: 'string', enum: ['ok', 'warning', 'exhausted', 'over_allowance'] },
+  },
+};
+
+const ruleViolation = {
+  type: 'object',
+  properties: {
+    rule: { type: 'string', enum: ['MAX_UNITS_PER_REQUEST', 'MONTHLY_ALLOWANCE'] },
+    level: { type: 'string', enum: ['account', 'user'] },
+    limit: { type: 'integer' },
+    requested: { type: 'integer' },
+    remaining: { type: ['integer', 'null'] },
+    message: { type: 'string' },
+  },
+};
+
+const components = {
+  securitySchemes: {
+    apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Account API key (issued once at account creation).' },
+    admin: { type: 'http', scheme: 'bearer', description: 'Operator token (ADMIN_API_TOKEN). Local/demo mechanism.' },
+  },
+  schemas: {
+    Error: {
+      type: 'object',
+      properties: {
+        error: {
+          type: 'object',
+          required: ['code', 'message', 'requestId'],
+          properties: {
+            code: { type: 'string', example: 'USER_NOT_FOUND' },
+            message: { type: 'string' },
+            requestId: { type: ['string', 'null'] },
+            details: { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, message: { type: 'string' } } } },
+          },
+        },
+      },
+    },
+    Page: {
+      type: 'object',
+      required: ['items', 'page', 'pageSize', 'totalItems', 'totalPages', 'hasNextPage', 'hasPreviousPage'],
+      properties: {
+        items: { type: 'array', items: {} },
+        page: { type: 'integer' },
+        pageSize: { type: 'integer' },
+        totalItems: { type: 'integer' },
+        totalPages: { type: 'integer' },
+        hasNextPage: { type: 'boolean' },
+        hasPreviousPage: { type: 'boolean' },
+      },
+    },
+    QuotaSnapshot: quotaSnapshot,
+    RuleViolation: ruleViolation,
+    ConsumeDecision: {
+      type: 'object',
+      properties: {
+        usageRecordId: { type: 'string', format: 'uuid' },
+        requestId: { type: 'string' },
+        userId: { type: 'string' },
+        units: { type: 'integer' },
+        accepted: { type: 'boolean' },
+        rejection: { oneOf: [ref('RuleViolation'), { type: 'null' }] },
+        violations: { type: 'array', items: ref('RuleViolation') },
+        account: ref('QuotaSnapshot'),
+        user: ref('QuotaSnapshot'),
+        period: { type: 'string' },
+        processedAt: { type: 'string', format: 'date-time' },
+        idempotentReplay: { type: 'boolean' },
+      },
+    },
+    QuotaCheckResult: {
+      type: 'object',
+      properties: {
+        dryRun: { const: true },
+        allowed: { type: 'boolean' },
+        rejection: { oneOf: [ref('RuleViolation'), { type: 'null' }] },
+        violations: { type: 'array', items: ref('RuleViolation') },
+        account: ref('QuotaSnapshot'),
+        user: ref('QuotaSnapshot'),
+      },
+    },
+    UsageRecord: { type: 'object', description: 'See UsageRecord in backend/src/contracts/usage.ts' },
+    UserWithQuota: { type: 'object', properties: { id: { type: 'string' }, externalUserId: { type: 'string' }, displayName: { type: ['string', 'null'] }, quota: ref('QuotaSnapshot') } },
+    AccountListItem: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, apiKeyPrefix: { type: 'string' }, userCount: { type: 'integer' }, quota: ref('QuotaSnapshot') } },
+    CreateAccountResponse: { type: 'object', properties: { account: ref('AccountListItem'), apiKey: { type: 'string', description: 'Shown once. Store it securely.' } } },
+    Plan: { type: 'object', description: 'See Plan / PlanDetails in backend/src/contracts/plans.ts' },
+    Status: { type: 'object', properties: { status: { type: 'string' } } },
+    Object: { type: 'object', description: 'See the TypeScript contract in backend/src/contracts and docs/API_CONTRACTS.md' },
+  },
+};
+
+function responseSchema(name: string): object {
+  const match = name.match(/^Page<(.+)>$/);
+  return match ? page(match[1]!) : ref(name);
+}
+
+function securityFor(security: Security): object[] | undefined {
+  if (security === 'none') return [];
+  if (security === 'either') return [{ apiKey: [] }, { admin: [] }];
+  return [{ [security]: [] }];
+}
+
+function queryParameters(schema: ZodObject): object[] {
+  const json = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }) as { properties?: Record<string, object>; required?: string[] };
+  return Object.entries(json.properties ?? {}).map(([name, property]) => ({ name, in: 'query', required: json.required?.includes(name) ?? false, schema: property }));
+}
+
+const errorResponse = (description: string) => ({ description, content: { 'application/json': { schema: ref('Error') } } });
+
+export function buildOpenApiDocument(serverUrl: string): Record<string, unknown> {
+  const paths: Record<string, Record<string, unknown>> = {};
+  for (const route of routes) {
+    const parameters = [
+      ...(route.params ?? []).map((name) => ({ name, in: 'path', required: true, schema: { type: 'string' } })),
+      ...(route.query ? queryParameters(route.query) : []),
+    ];
+    const responses: Record<string, unknown> = {
+      [String(route.status ?? 200)]: { description: 'Success', content: { 'application/json': { schema: responseSchema(route.response) } } },
+    };
+    if (route.body || route.query || route.params) responses['400'] = errorResponse('Validation error');
+    if (route.security !== 'none') responses['401'] = errorResponse('Missing or invalid credential');
+    if (route.params) responses['404'] = errorResponse('Not found (including resources of other accounts)');
+    if (route.path === '/usage/consume') responses['409'] = errorResponse('IDEMPOTENCY_KEY_REUSED');
+    if (route.path.startsWith('/plans/') && route.method === 'patch') responses['403'] = errorResponse('PLAN_READ_ONLY');
+
+    paths[route.path] ??= {};
+    paths[route.path]![route.method] = {
+      tags: [route.tag],
+      summary: route.summary,
+      security: securityFor(route.security),
+      ...(parameters.length > 0 ? { parameters } : {}),
+      ...(route.body ? { requestBody: { required: true, content: { 'application/json': { schema: z.toJSONSchema(route.body, { io: 'input', unrepresentable: 'any' }) } } } } : {}),
+      responses,
+    };
+  }
+  return {
+    openapi: '3.1.0',
+    info: {
+      title: 'Usage Metering & Quota Service',
+      version: '1.0.0',
+      description:
+        'Two-level quota enforcement: every consume request must satisfy the account plan (shared) and the user plan (individual). A rejection returns 200 with accepted=false. See docs/API_CONTRACTS.md.',
+    },
+    servers: [{ url: serverUrl }],
+    paths,
+    components,
+  };
+}

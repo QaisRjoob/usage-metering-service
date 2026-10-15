@@ -1,0 +1,108 @@
+{
+  "label": "baseline",
+  "date": "2026-10-15T10:29:10.054Z",
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "Windows_NT 10.0.26300",
+    "cpus": "12 x Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+    "memoryGb": 34
+  },
+  "apiUrl": "http://127.0.0.1:3200/api/v1",
+  "results": [
+    {
+      "scenario": "hot (1 account, 200 users)",
+      "connections": 50,
+      "durationSeconds": 15.02,
+      "requests": 5468,
+      "throughputRps": 365,
+      "latencyMs": {
+        "p50": 95,
+        "p90": 249,
+        "p97_5": 292,
+        "p99": 318,
+        "max": 629
+      },
+      "non2xx": 0,
+      "socketErrors": 0,
+      "timeouts": 0,
+      "accepted": 5468,
+      "rejected": 0,
+      "errors": 0,
+      "correctness": {
+        "accountCounterMismatches": 0,
+        "userCounterMismatches": 0,
+        "countersOverAllowance": 0
+      }
+    },
+    {
+      "scenario": "spread (50 accounts x 20 users)",
+      "connections": 50,
+      "durationSeconds": 15.02,
+      "requests": 11972,
+      "throughputRps": 798,
+      "latencyMs": {
+        "p50": 61,
+        "p90": 70,
+        "p97_5": 79,
+        "p99": 83,
+        "max": 114
+      },
+      "non2xx": 0,
+      "socketErrors": 0,
+      "timeouts": 0,
+      "accepted": 11972,
+      "rejected": 0,
+      "errors": 0,
+      "correctness": {
+        "accountCounterMismatches": 0,
+        "userCounterMismatches": 0,
+        "countersOverAllowance": 0
+      }
+    },
+    {
+      "scenario": "limit (contended last units)",
+      "connections": 50,
+      "durationSeconds": 10.02,
+      "requests": 4000,
+      "throughputRps": 400,
+      "latencyMs": {
+        "p50": 99,
+        "p90": 203,
+        "p97_5": 240,
+        "p99": 254,
+        "max": 359
+      },
+      "non2xx": 0,
+      "socketErrors": 0,
+      "timeouts": 0,
+      "accepted": 2000,
+      "rejected": 2000,
+      "errors": 0,
+      "expectedAccepted": 2000,
+      "acceptedMatchesLimit": true,
+      "correctness": {
+        "accountCounterMismatches": 0,
+        "userCounterMismatches": 0,
+        "countersOverAllowance": 0
+      }
+    },
+    {
+      "scenario": "history (paginated reads over 5518 records)",
+      "connections": 50,
+      "durationSeconds": 15.04,
+      "requests": 4342,
+      "throughputRps": 289,
+      "latencyMs": {
+        "p50": 162,
+        "p90": 219,
+        "p97_5": 267,
+        "p99": 292,
+        "max": 404
+      },
+      "non2xx": 0,
+      "socketErrors": 0,
+      "timeouts": 0,
+      "errors": 0
+    }
+  ]
+}

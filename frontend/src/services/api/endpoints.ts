@@ -1,0 +1,48 @@
+/** Every API path used by the web app, relative to apiConfig.baseUrl (".../api/v1"). */
+const segment = (value: string): string => encodeURIComponent(value);
+
+export const endpoints = {
+  health: '/health',
+  ready: '/ready',
+
+  admin: {
+    accounts: '/admin/accounts',
+    account: (accountId: string) => `/admin/accounts/${segment(accountId)}`,
+    accountUsers: (accountId: string) => `/admin/accounts/${segment(accountId)}/users`,
+    usage: '/admin/usage',
+    analyticsSummary: '/admin/analytics/summary',
+  },
+
+  account: {
+    current: '/account',
+    plan: '/account/plan',
+    usageSummary: '/account/usage-summary',
+  },
+
+  users: {
+    list: '/users',
+    detail: (userId: string) => `/users/${segment(userId)}`,
+    plan: (userId: string) => `/users/${segment(userId)}/plan`,
+    usageSummary: (userId: string) => `/users/${segment(userId)}/usage-summary`,
+  },
+
+  plans: {
+    list: '/plans',
+    detail: (planId: string) => `/plans/${segment(planId)}`,
+  },
+
+  quotas: {
+    overview: '/quotas',
+    check: '/quotas/check',
+  },
+
+  usage: {
+    consume: '/usage/consume',
+    list: '/usage',
+    detail: (usageId: string) => `/usage/${segment(usageId)}`,
+  },
+
+  ai: {
+    advisor: '/ai/advisor',
+  },
+} as const;

@@ -1,0 +1,42 @@
+/**
+ * Error codes returned in the `error.code` field of every error response.
+ * The HTTP status for each code is fixed and documented in docs/API_CONTRACTS.md.
+ */
+export const ERROR_CODES = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR', // 400
+  API_KEY_MISSING: 'API_KEY_MISSING', // 401
+  API_KEY_INVALID: 'API_KEY_INVALID', // 401
+  ADMIN_TOKEN_MISSING: 'ADMIN_TOKEN_MISSING', // 401
+  ADMIN_TOKEN_INVALID: 'ADMIN_TOKEN_INVALID', // 401
+  PLAN_READ_ONLY: 'PLAN_READ_ONLY', // 403
+  NOT_FOUND: 'NOT_FOUND', // 404 (unknown route)
+  ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND', // 404
+  USER_NOT_FOUND: 'USER_NOT_FOUND', // 404
+  PLAN_NOT_FOUND: 'PLAN_NOT_FOUND', // 404
+  USAGE_RECORD_NOT_FOUND: 'USAGE_RECORD_NOT_FOUND', // 404
+  USER_ALREADY_EXISTS: 'USER_ALREADY_EXISTS', // 409
+  PLAN_NAME_TAKEN: 'PLAN_NAME_TAKEN', // 409
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED', // 409
+  PLAN_SCOPE_MISMATCH: 'PLAN_SCOPE_MISMATCH', // 422
+  RATE_LIMITED: 'RATE_LIMITED', // 429
+  AI_PROVIDER_ERROR: 'AI_PROVIDER_ERROR', // 502
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE', // 503
+  INTERNAL_ERROR: 'INTERNAL_ERROR', // 500
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+export interface ValidationIssue {
+  path: string;
+  message: string;
+}
+
+/** Shape of every non-2xx JSON response body. */
+export interface ApiErrorBody {
+  error: {
+    code: ErrorCode;
+    message: string;
+    requestId: string | null;
+    details?: ValidationIssue[] | Record<string, unknown>;
+  };
+}

@@ -1,0 +1,75 @@
+Inserted 500000 usage records for account 48957197-d43c-4859-bda7-e13258593389. API key (perf only): [redacted]
+
+### History page 1 (account, newest first)
+Limit (actual time=11.404..11.410 rows=20 loops=1)
+  Buffers: shared hit=23283 read=911
+  ->  Index Scan using usage_records_created_idx on usage_records r (actual time=11.403..11.407 rows=20 loops=1)
+        Filter: (account_id = '48957197-d43c-4859-bda7-e13258593389'::uuid)
+        Rows Removed by Filter: 24043
+        Buffers: shared hit=23283 read=911
+Planning:
+  Buffers: shared hit=69 read=7
+Planning Time: 3.776 ms
+Execution Time: 11.422 ms
+
+### History page 200 (deep offset)
+Limit (actual time=7.894..7.899 rows=20 loops=1)
+  Buffers: shared hit=24291 read=34
+  ->  Index Scan using usage_records_created_idx on usage_records r (actual time=6.622..7.811 rows=4000 loops=1)
+        Filter: (account_id = '48957197-d43c-4859-bda7-e13258593389'::uuid)
+        Rows Removed by Filter: 24043
+        Buffers: shared hit=24291 read=34
+Planning Time: 0.142 ms
+Execution Time: 7.914 ms
+
+### History, previous month filter
+Limit (actual time=5.903..5.910 rows=20 loops=1)
+  Buffers: shared hit=4 read=2
+  ->  Index Only Scan using usage_records_account_period_idx on usage_records r (actual time=5.903..5.908 rows=20 loops=1)
+        Index Cond: ((account_id = '48957197-d43c-4859-bda7-e13258593389'::uuid) AND (period = '2026-09-01'::date))
+        Heap Fetches: 20
+        Buffers: shared hit=4 read=2
+Planning:
+  Buffers: shared hit=5
+Planning Time: 0.114 ms
+Execution Time: 5.921 ms
+
+### History count (account + month)
+Finalize Aggregate (actual time=53.289..86.714 rows=1 loops=1)
+  Buffers: shared hit=3795 read=124
+  ->  Gather (actual time=37.000..86.707 rows=3 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=3795 read=124
+        ->  Partial Aggregate (actual time=12.639..12.639 rows=1 loops=3)
+              Buffers: shared hit=3795 read=124
+              ->  Parallel Bitmap Heap Scan on usage_records r (actual time=1.954..10.120 rows=51852 loops=3)
+                    Recheck Cond: (period = '2026-09-01'::date)
+                    Filter: (account_id = '48957197-d43c-4859-bda7-e13258593389'::uuid)
+                    Heap Blocks: exact=3795
+                    Buffers: shared hit=3795 read=124
+                    ->  Bitmap Index Scan on usage_records_period_idx (actual time=4.054..4.054 rows=155556 loops=1)
+                          Index Cond: (period = '2026-09-01'::date)
+                          Buffers: shared read=124
+Planning:
+  Buffers: shared hit=5 read=1
+Planning Time: 0.131 ms
+Execution Time: 86.743 ms
+
+### Daily series (account + month)
+HashAggregate (actual time=129.261..129.324 rows=29 loops=1)
+  Group Key: to_char((created_at AT TIME ZONE 'UTC'::text), 'YYYY-MM-DD'::text)
+  Batches: 1  Memory Usage: 801kB
+  Buffers: shared hit=3919
+  ->  Bitmap Heap Scan on usage_records r (actual time=7.094..95.178 rows=155556 loops=1)
+        Recheck Cond: (period = '2026-09-01'::date)
+        Filter: (account_id = '48957197-d43c-4859-bda7-e13258593389'::uuid)
+        Heap Blocks: exact=3795
+        Buffers: shared hit=3919
+        ->  Bitmap Index Scan on usage_records_period_idx (actual time=5.507..5.507 rows=155556 loops=1)
+              Index Cond: (period = '2026-09-01'::date)
+              Buffers: shared hit=124
+Planning:
+  Buffers: shared hit=12
+Planning Time: 0.252 ms
+Execution Time: 129.882 ms
