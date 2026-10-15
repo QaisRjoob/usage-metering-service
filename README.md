@@ -68,6 +68,13 @@ has a "Use seeded demo key" button. Credentials stay in the browser tab only (se
 
 Start again from a clean state with `docker compose down -v && docker compose up --build`.
 
+**Verified on 2026-10-15** (Docker Desktop 29.8.2, Compose v5.6, Windows 11 + WSL 2): from a clean
+state the images built (web 75 MB, API 333 MB), startup ran postgres → API (migration applied, seed
+done) → web with all three containers healthy, and the full Client Demo scenario above passed in the
+browser at :8080. After `docker compose down` and `docker compose up` (volume kept), usage totals,
+plan assignments, history and idempotent replay of an earlier `requestId` were all preserved, and the
+migration check applied nothing new.
+
 ## 2. Using the example client
 
 ### Client Demo page (http://localhost:8080/demo)
@@ -476,9 +483,6 @@ npm run dev:api-mode          # http://localhost:5174 against the real API on :3
 - History totals use `count(*)`; for very large single-account months this costs ~90 ms (cursor
   pagination would avoid it).
 - The OpenAI provider was not run against the live API here (no credentials).
-- `docker compose up --build` was written and its API runtime stage was simulated locally
-  (production dependencies only + bundled server against PostgreSQL), but the images were not built
-  on this machine because Docker is not installed on it.
 - `npm audit` reports advisories only in dev tooling (vitest's `tinypool`); not part of any image.
 
 ---
