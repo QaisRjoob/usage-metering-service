@@ -1,9 +1,11 @@
 import { z } from 'zod';
-import { ACTIVITY_FILTERS } from './accounts';
+import { ACTIVITY_FILTERS, type AccountSummary } from './accounts';
+import type { MonthlyUsagePoint } from './analytics';
 import { dateSchema, idSchema, monthSchema, percentFilterSchema, rangeChecks, searchSchema } from './common';
-import { SORT_ORDERS, paginationQuerySchema } from './pagination';
-import { QUOTA_STATUSES, type QuotaStatus } from './quota';
-import type { ActivitySummary } from './usage';
+import { SORT_ORDERS, paginationQuerySchema, type PaginatedResponse } from './pagination';
+import type { Plan } from './plans';
+import { QUOTA_STATUSES, type QuotaSnapshot, type QuotaStatus } from './quota';
+import type { AccountUsageSummary, ActivitySummary, RequestCounts, UserUsageSummary } from './usage';
 import type { UserWithQuota } from './users';
 
 // ------------------------------------------------------------------ category counts (facets)
@@ -99,3 +101,71 @@ export const adminSearchQuerySchema = z.object({
   q: z.string().trim().min(1, 'Type something to search').max(100),
 });
 export type AdminSearchParams = z.infer<typeof adminSearchQuerySchema>;
+
+// ------------------------------------------------------------------ company and user drill-down
+
+/** GET /admin/accounts/:accountId/usage-summary - the company's statistics plus a 6-month trend. */
+export interface AdminAccountUsageSummary extends AccountUsageSummary {
+  /** Selected month and the five before it, for this company only. */
+  monthly: MonthlyUsagePoint[];
+}
+
+/** GET /admin/accounts/:accountId/users/:userId - one user of a company, as the operator sees it. */
+export interface AdminUserOverview extends UserUsageSummary {
+  account: { id: string; name: string };
+  plan: Plan;
+  activity: ActivitySummary;
+  /** Selected month and the five before it, for this user only. */
+  monthly: MonthlyUsagePoint[];
+}
+
+// ------------------------------------------------------------------ company statistics
+
+export interface CompanyStatsRow {
+  account: AccountSummary;
+  quota: QuotaSnapshot;
+  isCustomPlan: boolean;
+  users: number;
+  /** Users with at least one request in the month. */
+  activeUsers: number;
+  requests: RequestCounts;
+  /** rejected / (accepted + rejected), 0 when there were no requests. */
+  rejectionRatePercent: number;
+  /** This company's accepted units as a share of every company's accepted units in the month. */
+  shareOfUsagePercent: number;
+  lastRequestAt: string | null;
+}
+
+/** Sums over the companies that match the filters. */
+export interface CompanyStatsTotals {
+  companies: number;
+  activeCompanies: number;
+  users: number;
+  activeUsers: number;
+  unitsConsumed: number;
+  totalAllowance: number;
+  acceptedRequests: number;
+  rejectedRequests: number;
+  unitsRejected: number;
+}
+
+/** GET /admin/analytics/companies - one page of company statistics plus totals. */
+export interface CompanyStatsResponse extends PaginatedResponse<CompanyStatsRow> {
+  period: string;
+  totals: CompanyStatsTotals;
+}
+
+export const COMPANY_STATS_SORT_FIELDS = ['name', 'consumed', 'utilization', 'accepted', 'rejected', 'rejectionRate', 'users', 'activeUsers', 'lastActivity'] as const;
+export type CompanyStatsSortField = (typeof COMPANY_STATS_SORT_FIELDS)[number];
+
+export const companyStatsQuerySchema = paginationQuerySchema.extend({
+  /** Matches the company name, account id or API key prefix. */
+  search: searchSchema(100),
+  status: z.enum(QUOTA_STATUSES).optional(),
+  planId: idSchema.optional(),
+  activity: z.enum(ACTIVITY_FILTERS).optional(),
+  month: monthSchema.optional(),
+  sort: z.enum(COMPANY_STATS_SORT_FIELDS).default('consumed'),
+  order: z.enum(SORT_ORDERS).default('desc'),
+});
+export type CompanyStatsParams = Partial<z.infer<typeof companyStatsQuerySchema>>;

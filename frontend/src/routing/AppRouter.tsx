@@ -9,11 +9,13 @@ import {
   AccountUsageHistoryView,
   AccountsView,
   ClientDemoView,
+  CompanyStatsView,
   DashboardView,
   LoginView,
   NotFoundView,
   OperatorAiAdvisorView,
   OperatorPlansView,
+  OperatorUserDetailsView,
   OperatorUsersView,
   OperatorUsageHistoryView,
   PlansView,
@@ -41,6 +43,8 @@ export function AppRouter() {
         <Route path={op.root} element={<Lazy view={<DashboardView />} />} />
         <Route path={op.accounts} element={<Lazy view={<AccountsView />} />} />
         <Route path={op.accountDetails} element={<Lazy view={<AccountDetailsView />} />} />
+        <Route path={op.userDetails} element={<Lazy view={<OperatorUserDetailsView />} />} />
+        <Route path={op.companies} element={<Lazy view={<CompanyStatsView />} />} />
         <Route path={op.users} element={<Lazy view={<OperatorUsersView />} />} />
         <Route path={op.plans} element={<Lazy view={<OperatorPlansView />} />} />
         <Route path={op.usage} element={<Lazy view={<OperatorUsageHistoryView />} />} />

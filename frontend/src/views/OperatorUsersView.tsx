@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router';
 import type { AdminUserListItem } from '@/models/directory';
 import { QUOTA_STATUSES, STATUS_LABELS, type QuotaStatus } from '@/models/quota';
-import { buildAccountDetailsPath } from '@/routing/routePaths';
+import { buildAccountDetailsPath, buildOperatorUserPath } from '@/routing/routePaths';
 import { formatMonthLabel, formatUtcDateTime, recentMonths } from '@/utils/dateUtils';
 import { planFacetLabel, shortId } from '@/utils/formatUtils';
 import { formatUnits } from '@/utils/numberUtils';
@@ -112,7 +112,7 @@ export default function OperatorUsersView() {
     <>
       <PageHeader
         title="Users directory"
-        description="End users of every company with their individual quota and request activity. Search by user id or name, narrow to one company, browse by category; click a row to open the company. Quotas refer to the selected UTC month."
+        description="End users of every company with their individual quota and request activity. Search by user id or name, narrow to one company, browse by category; click a row for the user's statistics and activity, or the company name to open the company. Quotas refer to the selected UTC month."
       />
       <Card>
         <CategoryPanel>
@@ -197,7 +197,7 @@ export default function OperatorUsersView() {
               rows={vm.users.data?.items}
               getRowKey={(row) => row.id}
               isLoading={vm.users.isPending || vm.users.isFetching}
-              onRowClick={(row) => navigate(buildAccountDetailsPath(row.account.id))}
+              onRowClick={(row) => navigate(buildOperatorUserPath(row.account.id, row.externalUserId))}
               sort={{ field: list.sort, order: list.order }}
               onSort={list.setSort}
               empty={

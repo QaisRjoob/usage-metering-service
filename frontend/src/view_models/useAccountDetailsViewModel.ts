@@ -45,6 +45,14 @@ export function useAccountDetailsViewModel(accountId: string) {
   });
   const userPlans = [...(predefined.data?.items ?? []), ...(custom.data?.items ?? [])];
 
+  // Company statistics: requests, daily series, rejections by rule, top users and a 6-month trend.
+  const summary = useQuery({
+    queryKey: queryKeys.admin.accountSummary(accountId, month),
+    queryFn: () => services.directory.accountUsageSummary(accountId, month),
+    staleTime: staleTimes.summary,
+    placeholderData: keepPreviousData,
+  });
+
   const recentParams = { accountId, month, page: 1, pageSize: 8 };
   const recent = useQuery({
     queryKey: queryKeys.admin.usage(recentParams),
@@ -57,6 +65,7 @@ export function useAccountDetailsViewModel(accountId: string) {
     month,
     list,
     account,
+    summary,
     users,
     recent,
     planOptions: userPlans.map((plan) => ({ value: plan.id, label: plan.isPredefined ? plan.name : `${plan.name} (custom)` })),

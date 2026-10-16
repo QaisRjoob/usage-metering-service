@@ -251,16 +251,22 @@ export class PostgresUsageRepository implements UsageRepository {
   }
 
   /** Units come from the counter table (cheap); request counts from usage_records by period. */
-  async monthly(periods: QuotaPeriod[]): Promise<MonthlyUsagePoint[]> {
+  async monthly(periods: QuotaPeriod[], scope: { accountId?: string; userId?: string } = {}): Promise<MonthlyUsagePoint[]> {
     const dates = periods.map(periodToDate);
+    // Units come from the counters of the narrowest scope; request counts from usage_records.
+    const [units, records, params] = scope.userId
+      ? ['SELECT sum(c.consumed) FROM user_usage_counters c WHERE c.period = m.period AND c.user_id = $2', 'AND r.user_id = $2', [dates, scope.userId]]
+      : scope.accountId
+        ? ['SELECT sum(c.consumed) FROM account_usage_counters c WHERE c.period = m.period AND c.account_id = $2', 'AND r.account_id = $2', [dates, scope.accountId]]
+        : ['SELECT sum(c.consumed) FROM account_usage_counters c WHERE c.period = m.period', '', [dates]];
     const { rows } = await this.db.query<{ period: string; units: number; accepted: number; rejected: number }>(
       `SELECT m.period::text AS period,
-              COALESCE((SELECT sum(c.consumed) FROM account_usage_counters c WHERE c.period = m.period), 0) AS units,
-              (SELECT count(*) FROM usage_records r WHERE r.period = m.period AND r.outcome = 'accepted') AS accepted,
-              (SELECT count(*) FROM usage_records r WHERE r.period = m.period AND r.outcome = 'rejected') AS rejected
+              COALESCE((${units}), 0) AS units,
+              (SELECT count(*) FROM usage_records r WHERE r.period = m.period AND r.outcome = 'accepted' ${records}) AS accepted,
+              (SELECT count(*) FROM usage_records r WHERE r.period = m.period AND r.outcome = 'rejected' ${records}) AS rejected
        FROM unnest($1::date[]) AS m(period)
        ORDER BY m.period`,
-      [dates],
+      params,
     );
     return rows.map((row) => ({ period: periodFromDate(row.period), unitsConsumed: row.units, acceptedRequests: row.accepted, rejectedRequests: row.rejected }));
   }

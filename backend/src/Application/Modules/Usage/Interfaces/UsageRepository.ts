@@ -53,5 +53,6 @@ export interface UsageRepository {
   /** Days that have records only; the caller fills in empty days. */
   daily(filter: UsageFilter & { period: QuotaPeriod }): Promise<DailyUsagePoint[]>;
   rejectionsByRule(filter: UsageFilter): Promise<RejectionBreakdownItem[]>;
-  monthly(periods: QuotaPeriod[]): Promise<MonthlyUsagePoint[]>;
+  /** Totals per month; `scope` narrows them to one account or one user. */
+  monthly(periods: QuotaPeriod[], scope?: { accountId?: string; userId?: string }): Promise<MonthlyUsagePoint[]>;
 }

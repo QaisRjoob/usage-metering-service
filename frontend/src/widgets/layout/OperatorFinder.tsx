@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { Building2, Search, User } from 'lucide-react';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useServices } from '@/providers/ServicesProvider';
-import { buildAccountDetailsPath } from '@/routing/routePaths';
+import { buildAccountDetailsPath, buildOperatorUserPath } from '@/routing/routePaths';
 import { cn, pluralize } from '@/utils/formatUtils';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
@@ -13,12 +13,13 @@ interface FinderOption {
   kind: 'company' | 'user';
   title: string;
   detail: string;
-  accountId: string;
+  /** Where choosing the option goes. */
+  to: string;
 }
 
 /**
  * Operator header search: type a company name, account id, API key prefix, or a user id / name and
- * jump straight to the company. Results come from GET /admin/search (best matches first).
+ * jump straight to the company or the user. Results come from GET /admin/search (best matches first).
  */
 export function OperatorFinder() {
   const { directory } = useServices();
@@ -45,14 +46,14 @@ export function OperatorFinder() {
           kind: 'company' as const,
           title: account.name,
           detail: `${account.planName} · ${pluralize(account.userCount, 'user')} · ${account.apiKeyPrefix}…`,
-          accountId: account.id,
+          to: buildAccountDetailsPath(account.id),
         })),
         ...(results.data?.users ?? []).map((user) => ({
           key: `u-${user.id}`,
           kind: 'user' as const,
           title: user.displayName ? `${user.externalUserId} (${user.displayName})` : user.externalUserId,
           detail: `User of ${user.accountName}`,
-          accountId: user.accountId,
+          to: buildOperatorUserPath(user.accountId, user.externalUserId),
         })),
       ]
     : [];
@@ -67,7 +68,7 @@ export function OperatorFinder() {
   }, []);
 
   const choose = (option: FinderOption) => {
-    navigate(buildAccountDetailsPath(option.accountId));
+    navigate(option.to);
     setText('');
     setOpen(false);
   };

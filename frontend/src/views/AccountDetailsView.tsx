@@ -1,15 +1,18 @@
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Eye } from 'lucide-react';
-import { routePaths } from '@/routing/routePaths';
+import { buildOperatorUserPath, routePaths } from '@/routing/routePaths';
 import { formatMonthLabel, formatUtcDateTime } from '@/utils/dateUtils';
 import { formatUnits } from '@/utils/numberUtils';
 import { useAccountDetailsViewModel } from '@/view_models/useAccountDetailsViewModel';
 import { ErrorState } from '@/widgets/common/ErrorState';
-import { PageSkeleton, TableSkeleton } from '@/widgets/common/LoadingSkeleton';
+import { ChartSkeleton, PageSkeleton, TableSkeleton } from '@/widgets/common/LoadingSkeleton';
 import { MonthSelect } from '@/widgets/common/MonthSelect';
 import { PageHeader } from '@/widgets/common/PageHeader';
 import { PaginationControls } from '@/widgets/common/PaginationControls';
 import { RecentUsageTable } from '@/widgets/dashboard/RecentUsageTable';
+import { UsageTrendChart } from '@/widgets/dashboard/UsageTrendChart';
+import { LastActivityCell } from '@/widgets/directory/ActivityCells';
+import { MonthlyTrendChart, RejectionChips, StatGrid, StatTile } from '@/widgets/insights/InsightWidgets';
 import { QuotaSnapshotCard } from '@/widgets/quotas/QuotaSnapshotCard';
 import { UserFilterBar } from '@/widgets/users/UserFilterBar';
 import { UsersTable } from '@/widgets/users/UsersTable';
@@ -28,7 +31,10 @@ function BackLink() {
 export default function AccountDetailsView() {
   const { accountId = '' } = useParams();
   const vm = useAccountDetailsViewModel(accountId);
+  const navigate = useNavigate();
   const account = vm.account.data;
+  const summary = vm.summary.data;
+  const historyLink = (extra: string) => `${routePaths.operator.usage}?accountId=${encodeURIComponent(accountId)}&month=${vm.month}${extra}`;
 
   if (vm.account.error && !account) {
     return (
@@ -60,31 +66,43 @@ export default function AccountDetailsView() {
       <div className="grid gap-6 lg:grid-cols-3">
         <QuotaSnapshotCard quota={account.quota} title="Account plan (shared by all users)" />
         <Card className="lg:col-span-2">
-          <CardHeader title="Requests" description={formatMonthLabel(vm.month)} />
-          <CardBody>
-            <dl className="grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-lg bg-emerald-50 p-3">
-                <dt className="text-xs text-emerald-700">Accepted</dt>
-                <dd className="text-lg font-semibold tabular-nums text-emerald-900">{formatUnits(account.requests.accepted)}</dd>
-              </div>
-              <div className="rounded-lg bg-rose-50 p-3">
-                <dt className="text-xs text-rose-700">Rejected</dt>
-                <dd className="text-lg font-semibold tabular-nums text-rose-900">{formatUnits(account.requests.rejected)}</dd>
-              </div>
-              <div className="rounded-lg bg-slate-50 p-3">
-                <dt className="text-xs text-slate-600">Units rejected</dt>
-                <dd className="text-lg font-semibold tabular-nums">{formatUnits(account.requests.unitsRejected)}</dd>
-              </div>
-            </dl>
-            <p className="mt-4 text-xs text-slate-500">
+          <CardHeader title="Company statistics" description={formatMonthLabel(vm.month)} />
+          <CardBody className="space-y-4">
+            <StatGrid>
+              <StatTile label="Accepted requests" value={formatUnits(account.requests.accepted)} tone="success" />
+              <StatTile label="Rejected requests" value={formatUnits(account.requests.rejected)} tone="danger" hint={`${formatUnits(account.requests.unitsRejected)} units refused`} />
+              <StatTile
+                label="Rejection rate"
+                value={`${account.requests.accepted + account.requests.rejected === 0 ? 0 : Math.round((account.requests.rejected * 1000) / (account.requests.accepted + account.requests.rejected)) / 10}%`}
+              />
+              <StatTile label="Users" value={formatUnits(account.userCount)} hint={summary ? `${summary.users.approachingLimit} approaching · ${summary.users.atOrOverLimit} at or over limit` : undefined} />
+              <StatTile label="Units left (shared)" value={formatUnits(account.quota.remaining)} tone="brand" hint={`of ${formatUnits(account.quota.monthlyAllowance)}`} />
+              <StatTile label="Last request" value={<LastActivityCell lastRequestAt={account.activity.lastRequestAt} />} />
+            </StatGrid>
+            <div>
+              <p className="mb-1 text-xs font-medium tracking-wide text-slate-500 uppercase">Why requests were rejected</p>
+              {summary ? <RejectionChips items={summary.rejectionsByRule} linkFor={(item) => historyLink(`&outcome=rejected&rule=${item.rule}&level=${item.level}`)} /> : <p className="text-xs text-slate-400">Loading…</p>}
+            </div>
+            <p className="text-xs text-slate-500">
               The account&apos;s usage is the sum of accepted usage across its {account.userCount} users. A bigger user plan does not increase the shared allowance.
             </p>
           </CardBody>
         </Card>
       </div>
 
+      <div className="mt-6 grid gap-6 xl:grid-cols-5">
+        <Card className="xl:col-span-3">
+          <CardHeader title="Daily usage" description={`Units consumed and rejected requests per day · ${formatMonthLabel(vm.month)} (UTC)`} />
+          <CardBody>{summary ? <UsageTrendChart data={summary.daily} /> : <ChartSkeleton />}</CardBody>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader title="Last six months" description="This company only" />
+          <CardBody>{summary ? <MonthlyTrendChart data={summary.monthly} height={280} /> : <ChartSkeleton />}</CardBody>
+        </Card>
+      </div>
+
       <Card className="mt-6">
-        <CardHeader title="Users" description={`Individual quotas for ${formatMonthLabel(vm.month)}`} />
+        <CardHeader title="Users" description={`Individual quotas for ${formatMonthLabel(vm.month)} · click a user for their statistics and activity`} />
         <UserFilterBar list={vm.list} planOptions={vm.planOptions} planName={vm.planName} showMonth totalItems={vm.users.data?.totalItems} isFetching={vm.users.isFetching} />
         {!vm.list.isValid ? (
           <p role="alert" className="m-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
@@ -99,6 +117,7 @@ export default function AccountDetailsView() {
               isLoading={vm.users.isPending || vm.users.isFetching}
               sort={{ field: vm.list.sort, order: vm.list.order }}
               onSort={vm.list.setSort}
+              onOpenUser={(user) => navigate(`${buildOperatorUserPath(accountId, user.externalUserId)}?month=${vm.month}`)}
               emptyHint={vm.list.activeCount > 0 ? 'No users match these filters.' : 'This account has not registered any users yet.'}
               emptyAction={
                 vm.list.activeCount > 0 ? (
@@ -118,7 +137,7 @@ export default function AccountDetailsView() {
           title="Recent requests"
           description={formatMonthLabel(vm.month)}
           actions={
-            <Link to={`${routePaths.operator.usage}?accountId=${encodeURIComponent(accountId)}&month=${vm.month}`} className="text-xs font-medium text-brand-600 hover:underline">
+            <Link to={historyLink('')} className="text-xs font-medium text-brand-600 hover:underline">
               Full history with filters
             </Link>
           }

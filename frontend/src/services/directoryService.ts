@@ -1,5 +1,9 @@
 import type {
   AccountFacets,
+  AdminAccountUsageSummary,
+  AdminUserOverview,
+  CompanyStatsParams,
+  CompanyStatsResponse,
   AccountFacetsParams,
   AdminListUsersParams,
   AdminSearchResult,
@@ -21,6 +25,12 @@ export interface DirectoryService {
   userFacets(params: UserFacetsParams): Promise<UserFacets>;
   /** Header finder: a few companies and users matching the text. */
   search(q: string): Promise<AdminSearchResult>;
+  /** One company's statistics for a month, with a 6-month trend. */
+  accountUsageSummary(accountId: string, month?: string): Promise<AdminAccountUsageSummary>;
+  /** One user of a company: plan, quotas, requests, daily series and trend. */
+  userOverview(accountId: string, userId: string, month?: string): Promise<AdminUserOverview>;
+  /** Statistics of every company for a month, with totals. */
+  companyStats(params: CompanyStatsParams): Promise<CompanyStatsResponse>;
 }
 
 export function createHttpDirectoryService(): DirectoryService {
@@ -29,5 +39,8 @@ export function createHttpDirectoryService(): DirectoryService {
     listUsers: (params) => apiRequest(endpoints.admin.users, { auth: 'admin', query: { ...params } }),
     userFacets: (params) => apiRequest(endpoints.admin.userFacets, { auth: 'admin', query: { ...params } }),
     search: (q) => apiRequest(endpoints.admin.search, { auth: 'admin', query: { q } }),
+    accountUsageSummary: (accountId, month) => apiRequest(endpoints.admin.accountUsageSummary(accountId), { auth: 'admin', query: { month } }),
+    userOverview: (accountId, userId, month) => apiRequest(endpoints.admin.accountUser(accountId, userId), { auth: 'admin', query: { month } }),
+    companyStats: (params) => apiRequest(endpoints.admin.companyStats, { auth: 'admin', query: { ...params } }),
   };
 }

@@ -20,6 +20,7 @@ const operatorNav: NavSection[] = [
   {
     title: 'Insights',
     items: [
+      { to: routePaths.operator.companies, label: 'Company statistics', icon: BarChart3 },
       { to: routePaths.operator.usage, label: 'Usage history', icon: FileClock },
       { to: routePaths.operator.advisor, label: 'AI Advisor', icon: Bot },
     ],

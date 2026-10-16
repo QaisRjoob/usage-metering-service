@@ -8,6 +8,7 @@ import { IdentifyCredentialQuery } from './Application/Modules/Accounts/Queries/
 import { GetAccountDetailsQuery } from './Application/Modules/Accounts/Queries/GetAccountDetailsQuery';
 import { GetCurrentAccountQuery } from './Application/Modules/Accounts/Queries/GetCurrentAccountQuery';
 import { ListAccountsQuery } from './Application/Modules/Accounts/Queries/ListAccountsQuery';
+import { GetAdminAccountUsageSummaryQuery, GetAdminUserOverviewQuery, GetCompanyStatsQuery } from './Application/Modules/Directory/Queries/OperatorInsightQueries';
 import { AdminSearchQuery, GetAccountFacetsQuery, GetUserFacetsQuery, ListDirectoryUsersQuery } from './Application/Modules/Directory/Queries/DirectoryQueries';
 import { CreatePlanCommand } from './Application/Modules/Plans/Commands/CreatePlanCommand';
 import { UpdatePlanCommand } from './Application/Modules/Plans/Commands/UpdatePlanCommand';
@@ -57,6 +58,7 @@ export function createContainer(options: ContainerOptions) {
   const authenticate = new AuthenticateApiKeyQuery(new CachedApiKeyAccountRepository(repos.accounts));
   const accountUsageSummary = new GetAccountUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
   const adminAnalytics = new GetAdminAnalyticsQuery(analytics, repos.accounts, repos.usage, clock);
+  const userUsageSummary = new GetUserUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
 
   return {
     config,
@@ -84,6 +86,9 @@ export function createContainer(options: ContainerOptions) {
       users: new ListDirectoryUsersQuery(repos.users, clock),
       userFacets: new GetUserFacetsQuery(repos.users, clock),
       search: new AdminSearchQuery(repos.accounts, repos.users),
+      accountSummary: new GetAdminAccountUsageSummaryQuery(accountUsageSummary, repos.usage, clock),
+      userOverview: new GetAdminUserOverviewQuery(userUsageSummary, repos.accounts, repos.plans, repos.usage, clock),
+      companyStats: new GetCompanyStatsQuery(analytics, clock),
     },
     plans: {
       create: new CreatePlanCommand(repos.plans, clock),
@@ -101,7 +106,7 @@ export function createContainer(options: ContainerOptions) {
       list: new ListUsageQuery(repos.usage),
       get: new GetUsageRecordQuery(repos.usage),
       accountSummary: accountUsageSummary,
-      userSummary: new GetUserUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock),
+      userSummary: userUsageSummary,
       adminAnalytics,
     },
     ai: {

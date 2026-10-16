@@ -15,10 +15,12 @@ interface UsersTableProps {
   sort?: { field?: string; order?: 'asc' | 'desc' };
   onSort?: (field: string, firstOrder: 'asc' | 'desc') => void;
   emptyAction?: ReactNode;
+  /** Operator: opens the user's details (row click and a Details button). */
+  onOpenUser?: (user: UserWithQuota) => void;
 }
 
 /** Users with their individual (user-level) quota for the selected month. */
-export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, onSort, emptyAction }: UsersTableProps) {
+export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, onSort, emptyAction, onOpenUser }: UsersTableProps) {
   const columns: Column<UserWithQuota>[] = [
     {
       key: 'user',
@@ -74,8 +76,29 @@ export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, on
       align: 'right',
     });
   }
+  if (onOpenUser) {
+    columns.push({
+      key: 'open',
+      header: <span className="sr-only">Details</span>,
+      cell: (row) => (
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={`Details of ${row.externalUserId}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenUser(row);
+          }}
+        >
+          Details
+        </Button>
+      ),
+      align: 'right',
+    });
+  }
   return (
     <DataTable
+      onRowClick={onOpenUser}
       caption="Users"
       columns={columns}
       rows={users}

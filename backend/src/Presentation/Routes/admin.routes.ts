@@ -4,6 +4,7 @@ import {
   adminListUsageQuerySchema,
   adminListUsersQuerySchema,
   adminSearchQuerySchema,
+  companyStatsQuerySchema,
   createAccountSchema,
   listAccountsQuerySchema,
   listUsersQuerySchema,
@@ -14,12 +15,14 @@ import type { Container } from '../../container';
 import { accountNotFound } from '../../Domain/Accounts/AccountErrors';
 import { requireAdmin } from '../../Shared/Middleware/auth';
 import { validate } from '../../Shared/Validation/validate';
-import { accountIdParams, monthQuery } from '../Schemas/params';
+import { accountIdParams, monthQuery, userIdParams } from '../Schemas/params';
 
 /**
  * Operator endpoints (Authorization: Bearer ADMIN_API_TOKEN). They read across accounts but do not
  * replace the account API key: account-scoped changes (users, plans) still require that key.
  */
+const accountUserParams = accountIdParams.extend(userIdParams.shape);
+
 export function registerAdminRoutes(app: FastifyInstance, container: Container): void {
   app.register(async (admin) => {
     admin.addHook('preHandler', requireAdmin(container.config.ADMIN_API_TOKEN));
@@ -52,6 +55,18 @@ export function registerAdminRoutes(app: FastifyInstance, container: Container):
     admin.get('/admin/users/facets', async (request) => container.directory.userFacets.execute(validate(userFacetsQuerySchema, request.query)));
 
     admin.get('/admin/search', async (request) => container.directory.search.execute(validate(adminSearchQuerySchema, request.query).q));
+
+    admin.get('/admin/accounts/:accountId/usage-summary', async (request) => {
+      const { accountId } = validate(accountIdParams, request.params);
+      return container.directory.accountSummary.execute(accountId, validate(monthQuery, request.query).month);
+    });
+
+    admin.get('/admin/accounts/:accountId/users/:userId', async (request) => {
+      const { accountId, userId } = validate(accountUserParams, request.params);
+      return container.directory.userOverview.execute(accountId, userId, validate(monthQuery, request.query).month);
+    });
+
+    admin.get('/admin/analytics/companies', async (request) => container.directory.companyStats.execute(validate(companyStatsQuerySchema, request.query)));
 
     admin.get('/admin/plans', async (request) => container.plans.listAll.execute(validate(adminListPlansQuerySchema, request.query)));
 

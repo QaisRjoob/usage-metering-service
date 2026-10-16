@@ -20,6 +20,8 @@ describe('operator interface (/admin)', () => {
     ['/admin/accounts', 'Accounts'],
     [`/admin/accounts/${DEMO_ACCOUNT_ID}`, 'Demo Docs Inc'],
     ['/admin/users', 'Users directory'],
+    [`/admin/accounts/${DEMO_ACCOUNT_ID}/users/alice`, 'alice'],
+    ['/admin/companies', 'Company statistics'],
     ['/admin/plans', 'Plan catalogue'],
     ['/admin/usage', 'Usage history'],
     ['/admin/advisor', 'AI Usage Advisor'],
@@ -212,6 +214,32 @@ describe('server-side filters, sorting and pagination', () => {
     await user.type(finder, 'Demo Docs');
     await user.click(await screen.findByRole('option', { name: /Demo Docs Inc/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Demo Docs Inc' })).toBeInTheDocument();
+  });
+
+  it('opens a user of a company with statistics and request history', async () => {
+    const user = userEvent.setup();
+    signInAsOperator();
+    renderWithProviders(<AppRouter />, { route: `/admin/accounts/${DEMO_ACCOUNT_ID}` });
+    expect(await screen.findByRole('heading', { name: 'Company statistics' }, { timeout: 15_000 })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Details of bob' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'bob' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Request history' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Last six months' })).toBeInTheDocument();
+    // The seeded demo company has no traffic yet, so the history shows its empty state.
+    expect(await screen.findByText('No requests in this month')).toBeInTheDocument();
+  });
+
+  it('shows statistics of every company with totals, sorted on the server', async () => {
+    const user = userEvent.setup();
+    signInAsOperator();
+    renderWithProviders(<AppRouter />, { route: '/admin/companies' });
+    expect(await screen.findByText('13 results', {}, { timeout: 15_000 })).toBeInTheDocument();
+    expect(screen.getByText('Companies')).toBeInTheDocument();
+    const header = screen.getByRole('button', { name: /Rejection rate/ });
+    await user.click(header);
+    await waitFor(() => expect(header.closest('th')).toHaveAttribute('aria-sort', 'descending'));
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Activity' })).getByRole('radio', { name: 'No requests' }));
+    expect(await screen.findByRole('button', { name: 'Remove filter Activity: inactive' })).toBeInTheDocument();
   });
 
   it('shows the mock data badge in mock mode', async () => {

@@ -19,6 +19,7 @@ import {
   type ConsumeDecision,
   type ConsumeRequest,
   type DailyUsagePoint,
+  type MonthlyUsagePoint,
   type PaginatedResponse,
   type Plan,
   type PlanDetails,
@@ -648,6 +649,20 @@ export class MockDatabase {
       else rejectedRequests += 1;
     }
     return { acceptedRequests, rejectedRequests, lastRequestAt };
+  }
+
+  /** The month and the five before it, for one account or one user. */
+  monthlyFor(period: string, scope: { accountId: string; userId?: string }): MonthlyUsagePoint[] {
+    return Array.from({ length: 6 }, (_, index) => addMonths(period, index - 5)).map((month) => {
+      const rows = this.filterRequests({ accountId: scope.accountId, month }).filter((row) => !scope.userId || row.userId === scope.userId);
+      const counts = this.requestCounts(rows);
+      return {
+        period: month,
+        unitsConsumed: scope.userId ? this.userConsumed(scope.userId, month) : this.accountConsumed(scope.accountId, month),
+        acceptedRequests: counts.accepted,
+        rejectedRequests: counts.rejected,
+      };
+    });
   }
 
   accountDetails(account: AccountRow, period: string): AccountDetails {

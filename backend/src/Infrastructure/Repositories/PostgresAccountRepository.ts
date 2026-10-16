@@ -86,7 +86,7 @@ const SORT_SQL: Record<AccountListFilter['sort'], string> = {
 };
 
 /** Name, id, API key prefix, or the id / display name of one of the account's users. */
-function searchCondition(params: SqlParams, search: string): string {
+export function searchCondition(params: SqlParams, search: string): string {
   const pattern = params.add(likePattern(search));
   return `(a.name ILIKE ${pattern} OR a.id::text ILIKE ${pattern} OR a.api_key_prefix ILIKE ${pattern}
     OR EXISTS (SELECT 1 FROM users su WHERE su.account_id = a.id AND (su.external_user_id ILIKE ${pattern} OR su.display_name ILIKE ${pattern})))`;

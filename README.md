@@ -73,7 +73,7 @@ gets its own interface (own layout, menu and URL space); the other role's pages 
 
 | Interface | URL | Pages |
 |---|---|---|
-| Operator console | `/admin` | Overview (dashboard), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
+| Operator console | `/admin` | Overview (dashboard), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only company statistics: requests, rejection rate, daily chart, 6-month trend, users you can open), user details (one user's quotas, statistics, trends and request history), Company statistics (every company's usage, share, requests, rejection rate and active users, with totals), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
 | Account portal | `/app` | Overview, Users, Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
 
 Only one role is signed in at a time (signing in as one signs you out of the other), and the API
@@ -167,7 +167,7 @@ at `/api/v1/openapi.json` (Swagger UI: `/docs`). The contract types and request 
 | Area | Endpoints (prefix `/api/v1`) |
 |---|---|
 | Health | `GET /health`, `GET /ready` (checks PostgreSQL) |
-| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/facets`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/users`, `GET /admin/users/facets`, `GET /admin/search`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/analytics/summary` |
+| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/facets`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/accounts/:id/usage-summary`, `GET /admin/accounts/:id/users/:userId`, `GET /admin/analytics/companies`, `GET /admin/users`, `GET /admin/users/facets`, `GET /admin/search`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/analytics/summary` |
 | Account | `GET /account`, `PUT /account/plan`, `GET /account/usage-summary?month=YYYY-MM` |
 | Users | `GET/POST /users`, `GET /users/:userId`, `PUT /users/:userId/plan`, `GET /users/:userId/usage-summary` |
 | Plans | `GET/POST /plans`, `GET/PATCH /plans/:planId` |
