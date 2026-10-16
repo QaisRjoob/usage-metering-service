@@ -94,7 +94,7 @@ export function pageOf<T>(items: T[], params: { page?: number; pageSize?: number
 }
 
 /** Users of one account with their quota, filtered like the API's users list. */
-export function filteredUsers(db: MockDatabase, accountId: string, params: ListUsersParams, period: string): UserWithQuota[] {
+export function filteredUsers(db: MockDatabase, accountId: string, params: Omit<ListUsersParams, 'month'>, period: string): UserWithQuota[] {
   const search = params.search?.trim().toLowerCase();
   return db
     .accountUsers(accountId)
@@ -102,5 +102,18 @@ export function filteredUsers(db: MockDatabase, accountId: string, params: ListU
     .filter((user) => !params.planId || user.planId === params.planId)
     .map((user) => db.userWithQuota(user, period))
     .filter((user) => !params.status || user.quota.status === params.status)
-    .sort((a, b) => a.externalUserId.localeCompare(b.externalUserId));
+    .filter((user) => params.minUtilization === undefined || user.quota.utilizationPercent >= params.minUtilization)
+    .filter((user) => params.maxUtilization === undefined || user.quota.utilizationPercent <= params.maxUtilization)
+    .sort((a, b) => {
+      const direction = params.order === 'desc' ? -1 : 1;
+      const primary =
+        params.sort === 'utilization'
+          ? a.quota.utilizationPercent - b.quota.utilizationPercent
+          : params.sort === 'consumed'
+            ? a.quota.consumed - b.quota.consumed
+            : params.sort === 'createdAt'
+              ? a.createdAt.localeCompare(b.createdAt)
+              : a.externalUserId.localeCompare(b.externalUserId);
+      return (primary || a.id.localeCompare(b.id)) * direction;
+    });
 }

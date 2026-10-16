@@ -12,6 +12,42 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a UT
 
 export const idSchema = z.uuid();
 
+// ---------------------------------------------------------------- list-filter building blocks
+
+/** Free-text search: trimmed, bounded, and an empty string counts as "no filter". */
+export const searchSchema = (max = 100) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => (value === '' ? undefined : value))
+    .optional();
+
+/** Boolean query flag: accepts true/false from JSON and "true"/"false" from a query string. */
+export const queryBooleanSchema = z.union([z.boolean(), z.enum(['true', 'false']).transform((value) => value === 'true')]);
+
+/** Utilization percentage bound (can exceed 100 when an allowance was reduced below usage). */
+export const percentFilterSchema = z.coerce.number().min(0, 'Must be 0 or more').max(100_000);
+
+/** Units bound for range filters. */
+export const unitsFilterSchema = z.coerce.number().int('Must be a whole number').min(0, 'Must be 0 or more').max(MAX_UNITS_PER_REQUEST_INPUT);
+
+/**
+ * Refinement for range filters: for each [min, max] pair, when both are given, max must not be
+ * below min. Works for numbers and for YYYY-MM-DD dates (compared as strings).
+ */
+export function rangeChecks<T extends object>(pairs: ReadonlyArray<readonly [keyof T & string, keyof T & string]>) {
+  return (value: T, ctx: z.RefinementCtx) => {
+    for (const [minKey, maxKey] of pairs) {
+      const min = value[minKey] as unknown;
+      const max = value[maxKey] as unknown;
+      if (min !== undefined && max !== undefined && (max as number | string) < (min as number | string)) {
+        ctx.addIssue({ code: 'custom', path: [maxKey], message: `${maxKey} must be greater than or equal to ${minKey}` });
+      }
+    }
+  };
+}
+
 /** Units are positive whole numbers. Strings, decimals, zero and negatives are rejected. */
 export const unitsSchema = z
   .number({ error: 'units must be a number' })

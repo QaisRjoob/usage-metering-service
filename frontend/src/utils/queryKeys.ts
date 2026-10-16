@@ -1,5 +1,5 @@
 import type { ListAccountsParams } from '@/models/account';
-import type { ListPlansParams } from '@/models/plan';
+import type { AdminListPlansParams, ListPlansParams } from '@/models/plan';
 import type { AdminListUsageParams, ListUsageParams } from '@/models/usage-record';
 import type { ListUsersParams } from '@/models/user';
 import type { QuotasParams } from '@/services/quotaService';
@@ -17,6 +17,7 @@ export const queryKeys = {
     account: (accountId: string, month: string) => ['admin', 'account', accountId, month] as const,
     accountUsers: (accountId: string, params: ListUsersParams) => ['admin', 'account', accountId, 'users', params] as const,
     usage: (params: AdminListUsageParams) => ['admin', 'usage', params] as const,
+    plans: (params: AdminListPlansParams) => ['admin', 'plans', params] as const,
     ai: (question: string, month: string) => ['admin', 'ai', question, month] as const,
   },
   account: {

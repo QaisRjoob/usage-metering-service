@@ -63,11 +63,20 @@ predefined plans and the demo data (all idempotent) → the web app starts once 
 
 | Credential | Value | Used for |
 |---|---|---|
-| Operator admin token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`) | Dashboard, Accounts, cross-account history |
-| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | Client Demo, Plans, Quotas (account "Demo Docs Inc") |
+| Operator admin token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`) | the **operator console** (`/admin`) |
+| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | the **account portal** (`/app`) of "Demo Docs Inc" |
 
-In the web app, click **Credentials** (top right) or use the prompt each page shows; the demo key
-has a "Use seeded demo key" button. Credentials stay in the browser tab only (sessionStorage).
+The web app opens on a **login page** with two tabs, *Company account* and *Operator*. Each role
+gets its own interface (own layout, menu and URL space); the other role's pages are unreachable:
+
+| Interface | URL | Pages |
+|---|---|---|
+| Operator console | `/admin` | Overview (dashboard), Accounts, account details (read-only), Plan catalogue, Usage history across accounts, AI Advisor (all accounts) |
+| Account portal | `/app` | Overview, Users, Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
+
+Only one role is signed in at a time (signing in as one signs you out of the other), and the API
+enforces the same split independently: the admin token does not open account endpoints and an API
+key does not open `/admin`. Credentials stay in the browser tab only (sessionStorage).
 
 Start again from a clean state with `docker compose down -v && docker compose up --build`.
 
@@ -82,7 +91,7 @@ migration check applied nothing new.
 
 A click-by-click tour of all pages is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
-### Client Demo page (http://localhost:8080/demo)
+### Client Demo page (http://localhost:8080/app/demo)
 
 A simulated **document processor** — an external application — that calls the service with the demo
 account's API key. It knows nothing about plans; before "processing" a document it calls
@@ -144,7 +153,7 @@ share a plan definition keep separate totals.
   list accounts, cross-account history, dashboard analytics). Compared in constant time. This is a
   **local/demo mechanism**: in production it would sit behind real operator authentication (out of
   scope). The operator token does not open account-scoped endpoints: registering users or changing
-  plans always uses the account's own key (the dashboard asks for it).
+  plans always uses the account's own key, in the account portal. The operator's account pages are read-only.
 
 ## 5. API reference and curl walkthrough
 
@@ -156,7 +165,7 @@ at `/api/v1/openapi.json` (Swagger UI: `/docs`). The contract types and request 
 | Area | Endpoints (prefix `/api/v1`) |
 |---|---|
 | Health | `GET /health`, `GET /ready` (checks PostgreSQL) |
-| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/usage`, `GET /admin/analytics/summary` |
+| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/analytics/summary` |
 | Account | `GET /account`, `PUT /account/plan`, `GET /account/usage-summary?month=YYYY-MM` |
 | Users | `GET/POST /users`, `GET /users/:userId`, `PUT /users/:userId/plan`, `GET /users/:userId/usage-summary` |
 | Plans | `GET/POST /plans`, `GET/PATCH /plans/:planId` |
@@ -167,6 +176,25 @@ at `/api/v1/openapi.json` (Swagger UI: `/docs`). The contract types and request 
 Errors always look like `{"error": {"code", "message", "requestId", "details?"}}`. Lists are
 paginated: `?page=1&pageSize=20` (max 100) →
 `{items, page, pageSize, totalItems, totalPages, hasNextPage, hasPreviousPage}`.
+
+### Filtering and sorting (query DTOs)
+
+Every list takes a **query DTO**: a zod schema in [`backend/src/contracts`](backend/src/contracts)
+that validates and types the query string (`page`, `pageSize`, filters, `sort`, `order`). Filters
+are applied in SQL, sort keys come from a whitelist (never raw SQL), every ordering has a unique
+tie-breaker, and ranges are checked (`max ≥ min`, `to ≥ from`). Invalid input → `400 VALIDATION_ERROR`
+naming the field. The web app validates with the **same schema** before requesting, so mistakes show
+next to the field.
+
+| List | Filters | Sort keys |
+|---|---|---|
+| `GET /admin/accounts` | `search` (name/id), `status`, `planId`, `planKind` (predefined/custom), `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `name`, `createdAt`, `utilization`, `consumed`, `userCount` |
+| `GET /users`, `GET /admin/accounts/:id/users`, `GET /quotas` | `search`, `status`, `planId`, `minUtilization`/`maxUtilization`, `month` (not on quotas) | `externalUserId`, `createdAt`, `utilization`, `consumed` |
+| `GET /usage`, `GET /admin/usage` | `userId`, `outcome`, `rule`, `level`, `minUnits`/`maxUnits`, `requestId` (contains), `replayed`, `month`, `from`/`to`; admin adds `accountId` | `createdAt`, `units` |
+| `GET /plans`, `GET /admin/plans` | `search`, `scope`, `kind`; admin adds `ownerAccountId` | `name`, `createdAt`, `monthlyAllowance`, `maxUnitsPerRequest` |
+
+Example: the 20 largest rejections caused by a user limit this month, for one account:
+`GET /api/v1/admin/usage?accountId=…&level=user&month=2026-10&sort=units&order=desc&pageSize=20`.
 
 ### Main flow with curl
 
@@ -381,7 +409,7 @@ behind an ORM.
 allows indexed lookup). No JWT/end-user login (out of scope).
 
 **Frontend.** React + TanStack Query (server state, short `staleTime` for quotas, invalidation after
-every mutation), URL search params for filters/pagination, lazy-loaded pages, a mock adapter that
+every mutation), URL search params for filters/sort/pagination (one `useListQuery` hook validating with the shared query DTO), a login page with two role-guarded interfaces (`/admin`, `/app`), reusable filter bars (quick filters, "More filters" panel, removable chips, sortable column headers), lazy-loaded pages, a mock adapter that
 follows the same business rules (Phase 1) and the HTTP adapter behind the same interfaces. The mock is
 never active in a production build unless explicitly configured.
 

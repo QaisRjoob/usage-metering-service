@@ -28,13 +28,23 @@ export function createMockAccountService(): AccountService {
           .filter((account) => !search || account.name.toLowerCase().includes(search) || account.id.includes(search))
           .map((account) => db.accountListItem(account, period))
           .filter((account) => !query.status || account.quota.status === query.status)
+          .filter((account) => !query.planId || account.quota.planId === query.planId)
+          .filter((account) => !query.planKind || (query.planKind === 'predefined') === Boolean(db.plans.get(account.quota.planId)?.isPredefined))
+          .filter((account) => query.minUtilization === undefined || account.quota.utilizationPercent >= query.minUtilization)
+          .filter((account) => query.maxUtilization === undefined || account.quota.utilizationPercent <= query.maxUtilization)
+          .filter((account) => !query.createdFrom || account.createdAt.slice(0, 10) >= query.createdFrom)
+          .filter((account) => !query.createdTo || account.createdAt.slice(0, 10) <= query.createdTo)
           .sort((a, b) => {
             const primary =
               query.sort === 'name'
                 ? a.name.localeCompare(b.name)
                 : query.sort === 'utilization'
                   ? a.quota.utilizationPercent - b.quota.utilizationPercent
-                  : a.createdAt.localeCompare(b.createdAt);
+                  : query.sort === 'consumed'
+                    ? a.quota.consumed - b.quota.consumed
+                    : query.sort === 'userCount'
+                      ? a.userCount - b.userCount
+                      : a.createdAt.localeCompare(b.createdAt);
             return (primary || a.id.localeCompare(b.id)) * direction;
           });
         return pageOf(items, query);

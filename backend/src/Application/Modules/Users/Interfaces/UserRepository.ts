@@ -1,4 +1,4 @@
-import type { QuotaStatus } from '../../../../contracts';
+import type { QuotaStatus, SortOrder, UserSortField } from '../../../../contracts';
 import type { QuotaPeriod } from '../../../../Domain/Quotas/QuotaPeriod';
 import type { UsageSubject } from '../../../../Domain/Users/UsageSubject';
 import type { PageWindow } from '../../../Common/Pagination/pagination';
@@ -19,6 +19,10 @@ export interface UserListFilter {
   search?: string;
   planId?: string;
   status?: QuotaStatus;
+  minUtilization?: number;
+  maxUtilization?: number;
+  sort?: UserSortField;
+  order?: SortOrder;
 }
 
 export interface UserRepository {

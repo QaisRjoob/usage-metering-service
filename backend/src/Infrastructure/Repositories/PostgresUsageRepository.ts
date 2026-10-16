@@ -10,11 +10,11 @@ import type {
   UsageRecord as UsageRecordDto,
 } from '../../contracts';
 import type { PageWindow } from '../../Application/Common/Pagination/pagination';
-import type { UsageFilter, UsageRepository } from '../../Application/Modules/Usage/Interfaces/UsageRepository';
+import type { UsageFilter, UsageRepository, UsageSort } from '../../Application/Modules/Usage/Interfaces/UsageRepository';
 import { periodFromDate, periodToDate, type QuotaPeriod } from '../../Domain/Quotas/QuotaPeriod';
 import type { UsageRecord } from '../../Domain/Usage/UsageRecord';
 import type { Queryable } from '../Database/postgres';
-import { SqlParams } from './sqlFragments';
+import { SqlParams, likePattern } from './sqlFragments';
 
 interface RecordColumns {
   id: string;
@@ -117,6 +117,12 @@ function whereClause(filter: UsageFilter, params: SqlParams): string {
   // Inclusive UTC dates, expressed as a half-open timestamp range so the indexes can be used.
   if (filter.from) conditions.push(`r.created_at >= ${params.add(filter.from)}::date`);
   if (filter.to) conditions.push(`r.created_at < (${params.add(filter.to)}::date + 1)`);
+  if (filter.rule) conditions.push(`r.rejection_rule = ${params.add(filter.rule)}`);
+  if (filter.level) conditions.push(`r.rejection_level = ${params.add(filter.level)}`);
+  if (filter.minUnits !== undefined) conditions.push(`r.units_requested >= ${params.add(filter.minUnits)}`);
+  if (filter.maxUnits !== undefined) conditions.push(`r.units_requested <= ${params.add(filter.maxUnits)}`);
+  if (filter.requestId) conditions.push(`r.request_id ILIKE ${params.add(likePattern(filter.requestId))}`);
+  if (filter.replayed !== undefined) conditions.push(filter.replayed ? 'r.replay_count > 0' : 'r.replay_count = 0');
   return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 }
 
@@ -180,7 +186,12 @@ export class PostgresUsageRepository implements UsageRepository {
     return rows[0] ? toView(rows[0]) : null;
   }
 
-  async list(filter: UsageFilter, window: PageWindow): Promise<{ rows: UsageRecordDto[]; total: number }> {
+  async list(filter: UsageFilter, window: PageWindow, sort: UsageSort = { field: 'createdAt', order: 'desc' }): Promise<{ rows: UsageRecordDto[]; total: number }> {
+    // Whitelisted: created_at, or units then created_at. id keeps the order stable for equal values.
+    const direction = sort.order === 'asc' ? 'ASC' : 'DESC';
+    const orderBy = sort.field === 'units'
+      ? `r.units_requested ${direction}, r.created_at DESC, r.id DESC`
+      : `r.created_at ${direction}, r.id ${direction}`;
     const params = new SqlParams();
     const where = whereClause(filter, params);
     const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total FROM usage_records r ${where}`, params.values);
@@ -192,10 +203,10 @@ export class PostgresUsageRepository implements UsageRepository {
     const { rows } = await this.db.query<ViewColumns>(
       `WITH page AS (
          SELECT r.* FROM usage_records r ${where}
-         ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit} OFFSET ${offset}
+         ORDER BY ${orderBy} LIMIT ${limit} OFFSET ${offset}
        )
        ${viewSelect('page')}
-       ORDER BY r.created_at DESC, r.id DESC`,
+       ORDER BY ${orderBy}`,
       params.values,
     );
     return { rows: rows.map(toView), total: countResult.rows[0]?.total ?? 0 };

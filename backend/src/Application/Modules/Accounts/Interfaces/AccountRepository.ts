@@ -1,4 +1,4 @@
-import type { AccountSortField, QuotaStatus, SortOrder } from '../../../../contracts';
+import type { AccountSortField, PlanKind, QuotaStatus, SortOrder } from '../../../../contracts';
 import type { Account, AuthenticatedAccount } from '../../../../Domain/Accounts/Account';
 import type { QuotaPeriod } from '../../../../Domain/Quotas/QuotaPeriod';
 import type { PageWindow } from '../../../Common/Pagination/pagination';
@@ -19,6 +19,13 @@ export interface AccountListFilter {
   period: QuotaPeriod;
   search?: string;
   status?: QuotaStatus;
+  planId?: string;
+  planKind?: PlanKind;
+  minUtilization?: number;
+  maxUtilization?: number;
+  /** Inclusive UTC dates, YYYY-MM-DD. */
+  createdFrom?: string;
+  createdTo?: string;
   sort: AccountSortField;
   order: SortOrder;
 }

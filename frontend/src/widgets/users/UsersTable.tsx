@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { UserWithQuota } from '@/models/user';
 import { formatUnits } from '@/utils/numberUtils';
 import { DataTable, type Column } from '@/widgets/common/DataTable';
@@ -11,14 +12,19 @@ interface UsersTableProps {
   isLoading: boolean;
   onChangePlan?: (user: UserWithQuota) => void;
   emptyHint?: string;
+  sort?: { field?: string; order?: 'asc' | 'desc' };
+  onSort?: (field: string, firstOrder: 'asc' | 'desc') => void;
+  emptyAction?: ReactNode;
 }
 
 /** Users with their individual (user-level) quota for the selected month. */
-export function UsersTable({ users, isLoading, onChangePlan, emptyHint }: UsersTableProps) {
+export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, onSort, emptyAction }: UsersTableProps) {
   const columns: Column<UserWithQuota>[] = [
     {
       key: 'user',
       header: 'User',
+      sortKey: 'externalUserId',
+      firstOrder: 'asc',
       cell: (row) => (
         <div>
           <p className="font-mono text-xs font-medium text-slate-900">{row.externalUserId}</p>
@@ -38,6 +44,7 @@ export function UsersTable({ users, isLoading, onChangePlan, emptyHint }: UsersT
     {
       key: 'usage',
       header: 'Used / monthly',
+      sortKey: 'consumed',
       cell: (row) => (
         <span className="whitespace-nowrap text-xs tabular-nums">
           {formatUnits(row.quota.consumed)} / {formatUnits(row.quota.monthlyAllowance)}
@@ -49,6 +56,7 @@ export function UsersTable({ users, isLoading, onChangePlan, emptyHint }: UsersT
     {
       key: 'utilization',
       header: 'Utilization',
+      sortKey: 'utilization',
       cell: (row) => <QuotaProgressBar className="min-w-32" utilizationPercent={row.quota.utilizationPercent} status={row.quota.status} label={`${row.externalUserId} utilization`} />,
       hideBelow: 'md',
     },
@@ -73,7 +81,9 @@ export function UsersTable({ users, isLoading, onChangePlan, emptyHint }: UsersT
       rows={users}
       getRowKey={(row) => row.id}
       isLoading={isLoading}
-      empty={<EmptyState title="No users found" description={emptyHint ?? 'Register a user to start metering their usage.'} />}
+      sort={sort}
+      onSort={onSort}
+      empty={<EmptyState title="No users found" description={emptyHint ?? 'Register a user to start metering their usage.'} action={emptyAction} />}
     />
   );
 }

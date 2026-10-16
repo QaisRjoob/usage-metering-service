@@ -18,7 +18,19 @@ export class ListAccountsQuery {
   async execute(input: ListAccountsInput): Promise<PaginatedResponse<AccountListItem>> {
     const period = input.month ?? periodOf(this.clock.now());
     const { rows, total } = await this.accounts.list(
-      { period, search: input.search || undefined, status: input.status, sort: input.sort, order: input.order },
+      {
+        period,
+        search: input.search,
+        status: input.status,
+        planId: input.planId,
+        planKind: input.planKind,
+        minUtilization: input.minUtilization,
+        maxUtilization: input.maxUtilization,
+        createdFrom: input.createdFrom,
+        createdTo: input.createdTo,
+        sort: input.sort,
+        order: input.order,
+      },
       pageWindow(input.page, input.pageSize),
     );
     return toPage(rows, total, input.page, input.pageSize, (row) => toAccountListItem(row, period));

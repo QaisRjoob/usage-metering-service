@@ -53,10 +53,16 @@ const QUOTA_SELECT = `
          (SELECT count(*) FROM users u WHERE u.account_id = a.id) AS user_count
   ${QUOTA_FROM}`;
 
+const CONSUMED = 'COALESCE(c.consumed, 0)';
+const UTILIZATION = utilizationSql('pv.monthly_allowance', CONSUMED);
+
+/** Whitelist: the client chooses a key, never raw SQL. */
 const SORT_SQL: Record<AccountListFilter['sort'], string> = {
   name: 'lower(a.name)',
   createdAt: 'a.created_at',
-  utilization: utilizationSql('pv.monthly_allowance', 'COALESCE(c.consumed, 0)'),
+  utilization: UTILIZATION,
+  consumed: CONSUMED,
+  userCount: '(SELECT count(*) FROM users u WHERE u.account_id = a.id)',
 };
 
 export class PostgresAccountRepository implements AccountRepository {
@@ -99,7 +105,13 @@ export class PostgresAccountRepository implements AccountRepository {
       const pattern = params.add(likePattern(filter.search));
       conditions.push(`(a.name ILIKE ${pattern} OR a.id::text ILIKE ${pattern})`);
     }
-    if (filter.status) conditions.push(`${statusSql('pv.monthly_allowance', 'COALESCE(c.consumed, 0)')} = ${params.add(filter.status)}`);
+    if (filter.status) conditions.push(`${statusSql('pv.monthly_allowance', CONSUMED)} = ${params.add(filter.status)}`);
+    if (filter.planId) conditions.push(`a.plan_id = ${params.add(filter.planId)}`);
+    if (filter.planKind) conditions.push(`p.is_predefined = ${params.add(filter.planKind === 'predefined')}`);
+    if (filter.minUtilization !== undefined) conditions.push(`${UTILIZATION} >= ${params.add(filter.minUtilization)}`);
+    if (filter.maxUtilization !== undefined) conditions.push(`${UTILIZATION} <= ${params.add(filter.maxUtilization)}`);
+    if (filter.createdFrom) conditions.push(`a.created_at >= ${params.add(filter.createdFrom)}::date`);
+    if (filter.createdTo) conditions.push(`a.created_at < (${params.add(filter.createdTo)}::date + 1)`);
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const direction = filter.order === 'asc' ? 'ASC' : 'DESC';
 

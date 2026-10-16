@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { idSchema, monthSchema } from './common';
+import { dateSchema, idSchema, monthSchema, percentFilterSchema, rangeChecks, searchSchema } from './common';
 import { SORT_ORDERS, paginationQuerySchema } from './pagination';
-import type { Plan } from './plans';
+import { PLAN_KINDS, type Plan } from './plans';
 import { QUOTA_STATUSES, type QuotaSnapshot } from './quota';
 import type { RequestCounts } from './usage';
 
@@ -42,14 +42,32 @@ export const createAccountSchema = z.object({
 });
 export type CreateAccountRequest = z.infer<typeof createAccountSchema>;
 
-export const ACCOUNT_SORT_FIELDS = ['name', 'createdAt', 'utilization'] as const;
+/** Whitelisted sort fields; anything else is a 400. */
+export const ACCOUNT_SORT_FIELDS = ['name', 'createdAt', 'utilization', 'consumed', 'userCount'] as const;
 export type AccountSortField = (typeof ACCOUNT_SORT_FIELDS)[number];
 
-export const listAccountsQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().max(100).optional(),
-  status: z.enum(QUOTA_STATUSES).optional(),
-  month: monthSchema.optional(),
-  sort: z.enum(ACCOUNT_SORT_FIELDS).default('createdAt'),
-  order: z.enum(SORT_ORDERS).default('desc'),
-});
+/**
+ * GET /admin/accounts query DTO. Every filter is applied in SQL; utilization and status refer to
+ * the account-level quota of `month` (default: current UTC month).
+ */
+export const listAccountsQuerySchema = paginationQuerySchema
+  .extend({
+    search: searchSchema(100),
+    status: z.enum(QUOTA_STATUSES).optional(),
+    planId: idSchema.optional(),
+    planKind: z.enum(PLAN_KINDS).optional(),
+    minUtilization: percentFilterSchema.optional(),
+    maxUtilization: percentFilterSchema.optional(),
+    createdFrom: dateSchema.optional(),
+    createdTo: dateSchema.optional(),
+    month: monthSchema.optional(),
+    sort: z.enum(ACCOUNT_SORT_FIELDS).default('createdAt'),
+    order: z.enum(SORT_ORDERS).default('desc'),
+  })
+  .superRefine(
+    rangeChecks<{ minUtilization?: number; maxUtilization?: number; createdFrom?: string; createdTo?: string }>([
+      ['minUtilization', 'maxUtilization'],
+      ['createdFrom', 'createdTo'],
+    ]),
+  );
 export type ListAccountsParams = Partial<z.infer<typeof listAccountsQuerySchema>>;

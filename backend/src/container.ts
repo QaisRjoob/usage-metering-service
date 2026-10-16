@@ -10,6 +10,7 @@ import { ListAccountsQuery } from './Application/Modules/Accounts/Queries/ListAc
 import { CreatePlanCommand } from './Application/Modules/Plans/Commands/CreatePlanCommand';
 import { UpdatePlanCommand } from './Application/Modules/Plans/Commands/UpdatePlanCommand';
 import { GetPlanQuery } from './Application/Modules/Plans/Queries/GetPlanQuery';
+import { ListAllPlansQuery } from './Application/Modules/Plans/Queries/ListAllPlansQuery';
 import { ListPlansQuery } from './Application/Modules/Plans/Queries/ListPlansQuery';
 import { CheckQuotaQuery } from './Application/Modules/Quotas/Queries/CheckQuotaQuery';
 import { GetQuotasOverviewQuery } from './Application/Modules/Quotas/Queries/GetQuotasOverviewQuery';
@@ -77,6 +78,7 @@ export function createContainer(options: ContainerOptions) {
       create: new CreatePlanCommand(repos.plans, clock),
       update: new UpdatePlanCommand(transactions, clock),
       list: new ListPlansQuery(repos.plans),
+      listAll: new ListAllPlansQuery(repos.plans),
       get: new GetPlanQuery(repos.plans),
     },
     quotas: {

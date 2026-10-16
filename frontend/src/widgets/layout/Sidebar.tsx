@@ -1,41 +1,21 @@
 import { NavLink } from 'react-router';
-import { Bot, Building2, FileClock, Gauge, LayoutDashboard, Layers, PlayCircle, type LucideIcon } from 'lucide-react';
-import { routePaths } from '@/routing/routePaths';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/formatUtils';
 
-interface NavItem {
+export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  scope: 'Operator' | 'Account' | 'Either';
+  /** Match only the exact path (for section roots like /admin). */
+  end?: boolean;
 }
 
-const sections: { title: string; items: NavItem[] }[] = [
-  {
-    title: 'Operator',
-    items: [
-      { to: routePaths.dashboard, label: 'Dashboard', icon: LayoutDashboard, scope: 'Operator' },
-      { to: routePaths.accounts, label: 'Accounts', icon: Building2, scope: 'Operator' },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { to: routePaths.plans, label: 'Plans', icon: Layers, scope: 'Account' },
-      { to: routePaths.quotas, label: 'Quotas', icon: Gauge, scope: 'Account' },
-      { to: routePaths.clientDemo, label: 'Client Demo', icon: PlayCircle, scope: 'Account' },
-    ],
-  },
-  {
-    title: 'Insights',
-    items: [
-      { to: routePaths.usage, label: 'Usage history', icon: FileClock, scope: 'Either' },
-      { to: routePaths.aiAdvisor, label: 'AI Advisor', icon: Bot, scope: 'Either' },
-    ],
-  },
-];
+export interface NavSection {
+  title: string;
+  items: NavItem[];
+}
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({ sections, onNavigate }: { sections: NavSection[]; onNavigate?: () => void }) {
   return (
     <nav aria-label="Main navigation" className="flex flex-col gap-6 px-3 py-4">
       {sections.map((section) => (
@@ -46,7 +26,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               <li key={item.to}>
                 <NavLink
                   to={item.to}
-                  end={item.to === routePaths.dashboard}
+                  end={item.end}
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(

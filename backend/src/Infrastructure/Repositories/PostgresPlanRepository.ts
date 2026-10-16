@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { PlanKind, PlanScope } from '../../contracts';
+import type { PlanScope } from '../../contracts';
 import type { PageWindow } from '../../Application/Common/Pagination/pagination';
-import type { PlanRepository } from '../../Application/Modules/Plans/Interfaces/PlanRepository';
+import type { AdminPlanRow, PlanListFilter, PlanRepository } from '../../Application/Modules/Plans/Interfaces/PlanRepository';
 import type { PlanVersionRow } from '../../Application/Modules/Quotas/DTOs/quotaMapping';
 import type { Plan } from '../../Domain/Plans/Plan';
 import { planNameTaken } from '../../Domain/Plans/PlanErrors';
 import type { PlanVersion } from '../../Domain/Plans/PlanVersion';
 import type { QuotaLimits } from '../../Domain/Quotas/QuotaPolicy';
 import { PG_ERROR, pgErrorCode, type Queryable } from '../Database/postgres';
-import { PLAN_VERSION_COLUMNS, SqlParams, toPlanVersionRow, type PlanVersionColumns } from './sqlFragments';
+import { PLAN_VERSION_COLUMNS, SqlParams, likePattern, toPlanVersionRow, type PlanVersionColumns } from './sqlFragments';
 
 interface PlanColumns {
   id: string;
@@ -69,6 +69,30 @@ const toVersion = (row: VersionColumns): PlanVersion => ({
   createdAt: row.created_at,
 });
 
+/** Shared WHERE for plan lists (aliases p = plans, pv = current version). */
+function planWhere(filter: PlanListFilter, params: SqlParams, conditions: string[]): string {
+  if (filter.search) {
+    const pattern = params.add(likePattern(filter.search));
+    conditions.push(`(p.name ILIKE ${pattern} OR p.description ILIKE ${pattern})`);
+  }
+  if (filter.scope) conditions.push(`p.scope = ${params.add(filter.scope)}`);
+  if (filter.kind) conditions.push(`p.is_predefined = ${params.add(filter.kind === 'predefined')}`);
+  return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+}
+
+/** Whitelisted ORDER BY; the default lists predefined plans first. */
+const PLAN_SORT_SQL: Record<NonNullable<PlanListFilter['sort']>, string> = {
+  name: 'lower(p.name)',
+  createdAt: 'p.created_at',
+  monthlyAllowance: 'pv.monthly_allowance',
+  maxUnitsPerRequest: 'pv.max_units_per_request',
+};
+function planOrder(filter: PlanListFilter): string {
+  if (!filter.sort) return 'p.is_predefined DESC, p.scope ASC, lower(p.name) ASC, p.id ASC';
+  const direction = filter.order === 'desc' ? 'DESC' : 'ASC';
+  return `${PLAN_SORT_SQL[filter.sort]} ${direction}, p.id ${direction}`;
+}
+
 function rethrowNameConflict(error: unknown, name: string | undefined): never {
   if (pgErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION && name) throw planNameTaken(name);
   throw error;
@@ -87,21 +111,45 @@ export class PostgresPlanRepository implements PlanRepository {
     return rows[0] ? toPlan(rows[0]) : null;
   }
 
-  async listVisible(accountId: string, filter: { scope?: PlanScope; kind?: PlanKind }, window: PageWindow): Promise<{ rows: Plan[]; total: number }> {
+  async listVisible(accountId: string, filter: PlanListFilter, window: PageWindow): Promise<{ rows: Plan[]; total: number }> {
     const params = new SqlParams();
-    const conditions = [`(p.is_predefined OR p.owner_account_id = ${params.add(accountId)})`];
-    if (filter.scope) conditions.push(`p.scope = ${params.add(filter.scope)}`);
-    if (filter.kind) conditions.push(`p.is_predefined = ${params.add(filter.kind === 'predefined')}`);
-    const where = `WHERE ${conditions.join(' AND ')}`;
-    const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total FROM plans p ${where}`, params.values);
+    const where = planWhere(filter, params, [`(p.is_predefined OR p.owner_account_id = ${params.add(accountId)})`]);
+    const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total FROM plans p JOIN plan_versions pv ON pv.id = p.current_version_id ${where}`, params.values);
     const limit = params.add(window.limit);
     const offset = params.add(window.offset);
-    const { rows } = await this.db.query<PlanColumns>(
-      `${PLAN_SELECT} ${where} ORDER BY p.is_predefined DESC, p.scope ASC, lower(p.name) ASC, p.id ASC LIMIT ${limit} OFFSET ${offset}`,
-      params.values,
-    );
+    const { rows } = await this.db.query<PlanColumns>(`${PLAN_SELECT} ${where} ORDER BY ${planOrder(filter)} LIMIT ${limit} OFFSET ${offset}`, params.values);
     return { rows: rows.map(toPlan), total: countResult.rows[0]?.total ?? 0 };
   }
+
+  async listAll(filter: PlanListFilter & { ownerAccountId?: string }, window: PageWindow): Promise<{ rows: AdminPlanRow[]; total: number }> {
+    const params = new SqlParams();
+    const extra = filter.ownerAccountId ? [`p.owner_account_id = ${params.add(filter.ownerAccountId)}`] : [];
+    const where = planWhere(filter, params, extra);
+    const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total FROM plans p JOIN plan_versions pv ON pv.id = p.current_version_id ${where}`, params.values);
+    const limit = params.add(window.limit);
+    const offset = params.add(window.offset);
+    const { rows } = await this.db.query<PlanColumns>(`${PLAN_SELECT} ${where} ORDER BY ${planOrder(filter)} LIMIT ${limit} OFFSET ${offset}`, params.values);
+    // Owner names and assignment counts for just this page, keyed by plan id (keeps the page order).
+    const extras = await this.db.query<{ id: string; owner_account_name: string | null; assigned_accounts: number; assigned_users: number }>(
+      `SELECT p.id, o.name AS owner_account_name,
+              (SELECT count(*) FROM accounts a WHERE a.plan_id = p.id) AS assigned_accounts,
+              (SELECT count(*) FROM users u WHERE u.plan_id = p.id) AS assigned_users
+       FROM plans p LEFT JOIN accounts o ON o.id = p.owner_account_id
+       WHERE p.id = ANY($1::uuid[])`,
+      [rows.map((row) => row.id)],
+    );
+    const byId = new Map(extras.rows.map((row) => [row.id, row]));
+    return {
+      rows: rows.map((row) => ({
+        plan: toPlan(row),
+        ownerAccountName: byId.get(row.id)?.owner_account_name ?? null,
+        assignedAccounts: byId.get(row.id)?.assigned_accounts ?? 0,
+        assignedUsers: byId.get(row.id)?.assigned_users ?? 0,
+      })),
+      total: countResult.rows[0]?.total ?? 0,
+    };
+  }
+
 
   async listVersions(planId: string): Promise<PlanVersion[]> {
     const { rows } = await this.db.query<VersionColumns>(

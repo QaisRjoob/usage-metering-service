@@ -19,7 +19,16 @@ export class ListUsersQuery {
     const period = input.month ?? periodOf(this.clock.now());
     const { rows, total } = await this.users.list(
       accountId,
-      { period, search: input.search || undefined, planId: input.planId, status: input.status },
+      {
+        period,
+        search: input.search,
+        planId: input.planId,
+        status: input.status,
+        minUtilization: input.minUtilization,
+        maxUtilization: input.maxUtilization,
+        sort: input.sort,
+        order: input.order,
+      },
       pageWindow(input.page, input.pageSize),
     );
     return toPage(rows, total, input.page, input.pageSize, (row) => toUserWithQuota(row, period));

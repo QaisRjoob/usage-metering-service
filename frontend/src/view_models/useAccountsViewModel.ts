@@ -1,57 +1,34 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import type { AccountSortField, CreateAccountRequest, CreateAccountResponse, ListAccountsParams } from '@/models/account';
-import { ACCOUNT_SORT_FIELDS } from '@/models/account';
-import { DEFAULT_PAGE_SIZE } from '@/models/pagination';
-import { QUOTA_STATUSES, type QuotaStatus } from '@/models/quota';
-import { useCredentials } from '@/hooks/useCredentials';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useSearchParamState } from '@/hooks/useSearchParamState';
+import { useState } from 'react';
+import type { CreateAccountRequest, CreateAccountResponse } from '@/models/account';
+import { listAccountsQuerySchema } from '@/models/account';
+import { useListQuery } from '@/hooks/useListQuery';
 import { useServices } from '@/providers/ServicesProvider';
-import { credentials } from '@/services/api/credentials';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
-const isStatus = (value: string | undefined): value is QuotaStatus => QUOTA_STATUSES.includes(value as QuotaStatus);
-const isSortField = (value: string | undefined): value is AccountSortField => ACCOUNT_SORT_FIELDS.includes(value as AccountSortField);
+/** URL filter keys for the accounts list (validated by the shared listAccountsQuerySchema DTO). */
+export const ACCOUNT_FILTER_FIELDS = ['search', 'status', 'planId', 'planKind', 'minUtilization', 'maxUtilization', 'createdFrom', 'createdTo', 'month'] as const;
 
 export function useAccountsViewModel() {
   const services = useServices();
   const queryClient = useQueryClient();
-  const { adminToken } = useCredentials();
-  const url = useSearchParamState();
+  const list = useListQuery(listAccountsQuerySchema, ACCOUNT_FILTER_FIELDS, { pageSize: 20, sort: 'createdAt', order: 'desc' });
 
-  const statusParam = url.get('status');
-  const sortParam = url.get('sort');
-  const params: ListAccountsParams = {
-    page: url.getNumber('page', 1),
-    pageSize: url.getNumber('pageSize', DEFAULT_PAGE_SIZE),
-    search: url.get('search'),
-    status: isStatus(statusParam) ? statusParam : undefined,
-    sort: isSortField(sortParam) ? sortParam : 'createdAt',
-    order: url.get('order') === 'asc' ? 'asc' : 'desc',
-  };
-
-  // Search box: local draft, debounced into the URL (which resets the page).
-  const [searchDraft, setSearchDraft] = useState(params.search ?? '');
-  const debouncedSearch = useDebouncedValue(searchDraft, 350);
-  useEffect(() => {
-    if ((debouncedSearch.trim() || undefined) !== params.search) url.set({ search: debouncedSearch.trim() || null });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  const query = useQuery({
-    queryKey: queryKeys.admin.accounts(params),
-    queryFn: () => services.accounts.listAccounts(params),
-    enabled: Boolean(adminToken),
+  const accounts = useQuery({
+    queryKey: queryKeys.admin.accounts(list.query ?? {}),
+    queryFn: () => services.accounts.listAccounts(list.query!),
+    enabled: list.isValid,
     staleTime: staleTimes.accounts,
     placeholderData: keepPreviousData,
   });
 
-  // If the total shrank (e.g. a filter elsewhere), step back to the last existing page.
-  const totalPages = query.data?.totalPages;
-  useEffect(() => {
-    if (totalPages !== undefined && totalPages > 0 && (params.page ?? 1) > totalPages) url.set({ page: totalPages });
-  }, [totalPages, params.page, url]);
+  // Account plans for the "Plan" filter: predefined plus every custom account plan.
+  const planParams = { scope: 'account' as const, page: 1, pageSize: 100, sort: 'name' as const, order: 'asc' as const };
+  const plans = useQuery({
+    queryKey: queryKeys.admin.plans(planParams),
+    queryFn: () => services.plans.listAllPlans(planParams),
+    staleTime: staleTimes.plans,
+  });
 
   const [createdAccount, setCreatedAccount] = useState<CreateAccountResponse | null>(null);
   const createAccount = useMutation({
@@ -63,36 +40,18 @@ export function useAccountsViewModel() {
   });
 
   return {
-    params,
-    searchDraft,
-    setSearchDraft,
-    setStatus: (status: string) => url.set({ status: status || null }),
-    setSort: (sort: string) => {
-      const [field, order] = sort.split(':');
-      url.set({ sort: field ?? null, order: order ?? null });
-    },
-    setPage: (page: number) => url.set({ page }),
-    setPageSize: (pageSize: number) => url.set({ pageSize }),
-    accounts: query.data,
-    isLoading: query.isPending,
-    isFetching: query.isFetching,
-    error: query.error,
-    refetch: () => void query.refetch(),
+    list,
+    accounts,
+    planOptions: (plans.data?.items ?? []).map((plan) => ({
+      value: plan.id,
+      label: plan.isPredefined ? `${plan.name} (predefined)` : `${plan.name} — ${plan.ownerAccountName ?? 'custom'}`,
+    })),
+    planName: (planId: string) => plans.data?.items.find((plan) => plan.id === planId)?.name ?? 'selected plan',
     createAccount,
     createdAccount,
     dismissCreatedAccount: () => {
       setCreatedAccount(null);
       createAccount.reset();
-    },
-    /** Uses the freshly issued key as this tab's account credential (the key is still shown only once). */
-    connectCreatedAccount: () => {
-      if (!createdAccount) return;
-      credentials.setAccount({
-        apiKey: createdAccount.apiKey,
-        accountId: createdAccount.account.id,
-        accountName: createdAccount.account.name,
-        apiKeyPrefix: createdAccount.account.apiKeyPrefix,
-      });
     },
   };
 }

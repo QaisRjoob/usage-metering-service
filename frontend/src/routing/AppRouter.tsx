@@ -1,34 +1,67 @@
 import { Suspense, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router';
-import { AppLayout } from '@/widgets/layout/AppLayout';
 import { PageSkeleton } from '@/widgets/common/LoadingSkeleton';
+import { AccountLayout, OperatorLayout } from '@/widgets/layout/AppLayout';
 import {
+  AccountAiAdvisorView,
   AccountDetailsView,
+  AccountOverviewView,
+  AccountUsageHistoryView,
   AccountsView,
-  AiAdvisorView,
   ClientDemoView,
   DashboardView,
+  LoginView,
   NotFoundView,
+  OperatorAiAdvisorView,
+  OperatorPlansView,
+  OperatorUsageHistoryView,
   PlansView,
   QuotasView,
-  UsageHistoryView,
+  UsersView,
 } from './routeLoaders';
+import { HomeRedirect, RequireRole } from './RequireRole';
 import { routePaths } from './routePaths';
+
+const { operator: op, account: acc } = routePaths;
 
 export function AppRouter() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
-        <Route path={routePaths.dashboard} element={<Lazy view={<DashboardView />} />} />
-        <Route path={routePaths.accounts} element={<Lazy view={<AccountsView />} />} />
-        <Route path={routePaths.accountDetails} element={<Lazy view={<AccountDetailsView />} />} />
-        <Route path={routePaths.plans} element={<Lazy view={<PlansView />} />} />
-        <Route path={routePaths.quotas} element={<Lazy view={<QuotasView />} />} />
-        <Route path={routePaths.usage} element={<Lazy view={<UsageHistoryView />} />} />
-        <Route path={routePaths.clientDemo} element={<Lazy view={<ClientDemoView />} />} />
-        <Route path={routePaths.aiAdvisor} element={<Lazy view={<AiAdvisorView />} />} />
-        <Route path="*" element={<Lazy view={<NotFoundView />} />} />
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path={routePaths.login} element={<Lazy view={<LoginView />} />} />
+
+      <Route
+        element={
+          <RequireRole role="operator">
+            <OperatorLayout />
+          </RequireRole>
+        }
+      >
+        <Route path={op.root} element={<Lazy view={<DashboardView />} />} />
+        <Route path={op.accounts} element={<Lazy view={<AccountsView />} />} />
+        <Route path={op.accountDetails} element={<Lazy view={<AccountDetailsView />} />} />
+        <Route path={op.plans} element={<Lazy view={<OperatorPlansView />} />} />
+        <Route path={op.usage} element={<Lazy view={<OperatorUsageHistoryView />} />} />
+        <Route path={op.advisor} element={<Lazy view={<OperatorAiAdvisorView />} />} />
       </Route>
+
+      <Route
+        element={
+          <RequireRole role="account">
+            <AccountLayout />
+          </RequireRole>
+        }
+      >
+        <Route path={acc.root} element={<Lazy view={<AccountOverviewView />} />} />
+        <Route path={acc.users} element={<Lazy view={<UsersView />} />} />
+        <Route path={acc.plans} element={<Lazy view={<PlansView />} />} />
+        <Route path={acc.quotas} element={<Lazy view={<QuotasView />} />} />
+        <Route path={acc.usage} element={<Lazy view={<AccountUsageHistoryView />} />} />
+        <Route path={acc.demo} element={<Lazy view={<ClientDemoView />} />} />
+        <Route path={acc.advisor} element={<Lazy view={<AccountAiAdvisorView />} />} />
+      </Route>
+
+      <Route path="*" element={<Lazy view={<NotFoundView />} />} />
     </Routes>
   );
 }

@@ -11,7 +11,11 @@ export class ListPlansQuery {
   constructor(private readonly plans: PlanRepository) {}
 
   async execute(accountId: string, input: ListPlansInput): Promise<PaginatedResponse<Plan>> {
-    const { rows, total } = await this.plans.listVisible(accountId, { scope: input.scope, kind: input.kind }, pageWindow(input.page, input.pageSize));
+    const { rows, total } = await this.plans.listVisible(
+      accountId,
+      { search: input.search, scope: input.scope, kind: input.kind, sort: input.sort, order: input.order },
+      pageWindow(input.page, input.pageSize),
+    );
     return toPage(rows, total, input.page, input.pageSize, toPlanDto);
   }
 }

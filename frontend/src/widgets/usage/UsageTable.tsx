@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { UsageRecord } from '@/models/usage-record';
 import { formatUtcDateTime } from '@/utils/dateUtils';
 import { shortId } from '@/utils/formatUtils';
@@ -7,7 +8,7 @@ import { EmptyState } from '@/widgets/common/EmptyState';
 import { OutcomeBadge, RuleCell } from './OutcomeBadge';
 
 const columns: Column<UsageRecord>[] = [
-  { key: 'time', header: 'Time (UTC)', cell: (row) => <span className="whitespace-nowrap text-xs">{formatUtcDateTime(row.createdAt)}</span> },
+  { key: 'time', header: 'Time (UTC)', sortKey: 'createdAt', cell: (row) => <span className="whitespace-nowrap text-xs">{formatUtcDateTime(row.createdAt)}</span> },
   {
     key: 'id',
     header: 'Record',
@@ -43,6 +44,7 @@ const columns: Column<UsageRecord>[] = [
   {
     key: 'units',
     header: 'Units (req / used)',
+    sortKey: 'units',
     cell: (row) => `${formatUnits(row.unitsRequested)} / ${formatUnits(row.unitsConsumed)}`,
     align: 'right',
   },
@@ -62,16 +64,36 @@ const columns: Column<UsageRecord>[] = [
   },
 ];
 
-export function UsageTable({ records, isLoading, onSelect, hasFilters }: { records: UsageRecord[] | undefined; isLoading: boolean; onSelect: (record: UsageRecord) => void; hasFilters: boolean }) {
+export function UsageTable({
+  records,
+  isLoading,
+  onSelect,
+  hasFilters,
+  sort,
+  onSort,
+  showAccount = true,
+  emptyAction,
+}: {
+  records: UsageRecord[] | undefined;
+  isLoading: boolean;
+  onSelect: (record: UsageRecord) => void;
+  hasFilters: boolean;
+  sort?: { field?: string; order?: 'asc' | 'desc' };
+  onSort?: (field: string, firstOrder: 'asc' | 'desc') => void;
+  showAccount?: boolean;
+  emptyAction?: ReactNode;
+}) {
   return (
     <DataTable
       caption="Usage and request history"
-      columns={columns}
+      columns={showAccount ? columns : columns.filter((column) => column.key !== 'account')}
       rows={records}
       getRowKey={(row) => row.id}
       isLoading={isLoading}
       onRowClick={onSelect}
-      empty={<EmptyState title={hasFilters ? 'No records match these filters' : 'No requests recorded yet'} description="Accepted and rejected consume requests are recorded here. Dry-run checks are not." />}
+      sort={sort}
+      onSort={onSort}
+      empty={<EmptyState title={hasFilters ? 'No records match these filters' : 'No requests recorded yet'} description={hasFilters ? 'Remove a filter or clear them all.' : 'Accepted and rejected consume requests are recorded here. Dry-run checks are not.'} action={emptyAction} />}
     />
   );
 }

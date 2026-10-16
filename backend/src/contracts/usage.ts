@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { dateSchema, externalUserIdSchema, idSchema, monthSchema } from './common';
-import { paginationQuerySchema } from './pagination';
+import { dateSchema, externalUserIdSchema, idSchema, monthSchema, queryBooleanSchema, rangeChecks, searchSchema, unitsFilterSchema } from './common';
+import { SORT_ORDERS, paginationQuerySchema } from './pagination';
 import type { PaginatedResponse } from './pagination';
-import type { QuotaSnapshot, RuleCode, RuleLevel } from './quota';
+import { RULE_CODES, RULE_LEVELS, type QuotaSnapshot, type RuleCode, type RuleLevel } from './quota';
 import type { UserSummary, UserWithQuota } from './users';
 
 export const USAGE_OUTCOMES = ['accepted', 'rejected'] as const;
@@ -92,17 +92,37 @@ export interface QuotasOverview {
   users: PaginatedResponse<UserWithQuota>;
 }
 
-export const listUsageQuerySchema = paginationQuerySchema.extend({
+export const USAGE_SORT_FIELDS = ['createdAt', 'units'] as const;
+export type UsageSortField = (typeof USAGE_SORT_FIELDS)[number];
+
+const usageFilterFields = paginationQuerySchema.extend({
   userId: externalUserIdSchema.optional(),
   outcome: z.enum(USAGE_OUTCOMES).optional(),
+  /** Rule that rejected the request (implies outcome=rejected). */
+  rule: z.enum(RULE_CODES).optional(),
+  /** Level (account/user) of the rule that rejected the request. */
+  level: z.enum(RULE_LEVELS).optional(),
+  minUnits: unitsFilterSchema.optional(),
+  maxUnits: unitsFilterSchema.optional(),
+  /** Substring of the caller's request id. */
+  requestId: searchSchema(128),
+  /** true: only requests that were retried (replayed) at least once; false: never replayed. */
+  replayed: queryBooleanSchema.optional(),
   month: monthSchema.optional(),
   from: dateSchema.optional(),
   to: dateSchema.optional(),
+  sort: z.enum(USAGE_SORT_FIELDS).default('createdAt'),
+  order: z.enum(SORT_ORDERS).default('desc'),
 });
+const usageRanges = rangeChecks<{ minUnits?: number; maxUnits?: number; from?: string; to?: string }>([
+  ['minUnits', 'maxUnits'],
+  ['from', 'to'],
+]);
+
+/** GET /usage query DTO. The account always comes from the API key. */
+export const listUsageQuerySchema = usageFilterFields.superRefine(usageRanges);
 export type ListUsageParams = Partial<z.infer<typeof listUsageQuerySchema>>;
 
-/** Operator history across accounts. */
-export const adminListUsageQuerySchema = listUsageQuerySchema.extend({
-  accountId: idSchema.optional(),
-});
+/** GET /admin/usage query DTO: operator history across accounts. */
+export const adminListUsageQuerySchema = usageFilterFields.extend({ accountId: idSchema.optional() }).superRefine(usageRanges);
 export type AdminListUsageParams = Partial<z.infer<typeof adminListUsageQuerySchema>>;

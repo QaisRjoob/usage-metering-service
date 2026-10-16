@@ -3,7 +3,11 @@ import type {
   MonthlyUsagePoint,
   RejectionBreakdownItem,
   RequestCounts,
+  RuleCode,
+  RuleLevel,
+  SortOrder,
   UsageOutcome,
+  UsageSortField,
   UsageRecord as UsageRecordDto,
 } from '../../../../contracts';
 import type { QuotaPeriod } from '../../../../Domain/Quotas/QuotaPeriod';
@@ -19,6 +23,18 @@ export interface UsageFilter {
   /** Inclusive UTC dates, YYYY-MM-DD. */
   from?: string;
   to?: string;
+  rule?: RuleCode;
+  level?: RuleLevel;
+  minUnits?: number;
+  maxUnits?: number;
+  /** Substring of the request id (case-insensitive). */
+  requestId?: string;
+  replayed?: boolean;
+}
+
+export interface UsageSort {
+  field: UsageSortField;
+  order: SortOrder;
 }
 
 export interface UsageRepository {
@@ -31,7 +47,8 @@ export interface UsageRepository {
 
   // Read side (history and analytics). All filters are applied in SQL.
   findView(recordId: string, accountId: string | null): Promise<UsageRecordDto | null>;
-  list(filter: UsageFilter, window: PageWindow): Promise<{ rows: UsageRecordDto[]; total: number }>;
+  /** Default order: newest first (created_at DESC, id DESC). */
+  list(filter: UsageFilter, window: PageWindow, sort?: UsageSort): Promise<{ rows: UsageRecordDto[]; total: number }>;
   requestCounts(filter: UsageFilter): Promise<RequestCounts>;
   /** Days that have records only; the caller fills in empty days. */
   daily(filter: UsageFilter & { period: QuotaPeriod }): Promise<DailyUsagePoint[]>;

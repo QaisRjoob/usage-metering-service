@@ -12,12 +12,11 @@ import { validateWith } from '@/utils/validationUtils';
  * AI answers are personalised to the credential scope, so they are kept as mutation results and
  * not cached in the shared query cache.
  */
-export function useAiAdvisorViewModel() {
+export function useAiAdvisorViewModel(scope: AiScope) {
   const services = useServices();
   const creds = useCredentials();
   const [question, setQuestion] = useState('');
   const [month, setMonth] = useState(currentUtcMonth());
-  const [scope, setScope] = useState<AiScope>(creds.account ? 'account' : 'global');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const ask = useMutation({ mutationFn: (request: AiAdvisorRequest) => services.ai.ask(request, scope) });
@@ -36,12 +35,6 @@ export function useAiAdvisorViewModel() {
     month,
     setMonth,
     scope,
-    setScope: (next: AiScope) => {
-      setScope(next);
-      ask.reset();
-    },
-    canUseGlobal: Boolean(creds.adminToken),
-    canUseAccount: Boolean(creds.account),
     accountName: creds.account?.accountName ?? null,
     validationError,
     submit,

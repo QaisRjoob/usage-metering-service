@@ -8,4 +8,4 @@ export type {
   CurrentAccountResponse,
   ListAccountsParams,
 } from '@/contracts';
-export { ACCOUNT_SORT_FIELDS, createAccountSchema } from '@/contracts';
+export { ACCOUNT_SORT_FIELDS, createAccountSchema, listAccountsQuerySchema } from '@/contracts';

@@ -1,16 +1,34 @@
-import type { PlanKind, PlanScope } from '../../../../contracts';
+import type { PlanKind, PlanScope, PlanSortField, SortOrder } from '../../../../contracts';
 import type { Plan } from '../../../../Domain/Plans/Plan';
 import type { PlanVersion } from '../../../../Domain/Plans/PlanVersion';
 import type { QuotaLimits } from '../../../../Domain/Quotas/QuotaPolicy';
 import type { PageWindow } from '../../../Common/Pagination/pagination';
 import type { PlanVersionRow } from '../../Quotas/DTOs/quotaMapping';
 
+export interface PlanListFilter {
+  search?: string;
+  scope?: PlanScope;
+  kind?: PlanKind;
+  /** Absent = predefined first, then scope, then name. */
+  sort?: PlanSortField;
+  order?: SortOrder;
+}
+
+export interface AdminPlanRow {
+  plan: Plan;
+  ownerAccountName: string | null;
+  assignedAccounts: number;
+  assignedUsers: number;
+}
+
 export interface PlanRepository {
   findById(planId: string): Promise<Plan | null>;
   /** SELECT ... FOR UPDATE: serializes concurrent updates of the same plan. */
   findByIdForUpdate(planId: string): Promise<Plan | null>;
   /** Predefined plans plus the account's own custom plans. */
-  listVisible(accountId: string, filter: { scope?: PlanScope; kind?: PlanKind }, window: PageWindow): Promise<{ rows: Plan[]; total: number }>;
+  listVisible(accountId: string, filter: PlanListFilter, window: PageWindow): Promise<{ rows: Plan[]; total: number }>;
+  /** Operator catalogue: every plan, with its owner's name and assignment counts across accounts. */
+  listAll(filter: PlanListFilter & { ownerAccountId?: string }, window: PageWindow): Promise<{ rows: AdminPlanRow[]; total: number }>;
   listVersions(planId: string): Promise<PlanVersion[]>;
   countAssignments(planId: string, accountId: string): Promise<{ accounts: number; users: number }>;
   /** Throws PLAN_NAME_TAKEN for a duplicate custom plan name in the same account. */

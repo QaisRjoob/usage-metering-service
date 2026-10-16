@@ -54,6 +54,15 @@ const QUOTA_SELECT = `
   ${QUOTA_FROM}`;
 
 const CONSUMED = 'COALESCE(c.consumed, 0)';
+const UTILIZATION = utilizationSql('pv.monthly_allowance', CONSUMED);
+
+/** Whitelisted sort keys -> SQL. */
+const SORT_SQL: Record<NonNullable<UserListFilter['sort']>, string> = {
+  externalUserId: 'u.external_user_id',
+  createdAt: 'u.created_at',
+  utilization: UTILIZATION,
+  consumed: CONSUMED,
+};
 
 export class PostgresUserRepository implements UserRepository {
   constructor(private readonly db: Queryable) {}
@@ -101,13 +110,16 @@ export class PostgresUserRepository implements UserRepository {
     }
     if (filter.planId) conditions.push(`u.plan_id = ${params.add(filter.planId)}`);
     if (filter.status) conditions.push(`${statusSql('pv.monthly_allowance', CONSUMED)} = ${params.add(filter.status)}`);
+    if (filter.minUtilization !== undefined) conditions.push(`${UTILIZATION} >= ${params.add(filter.minUtilization)}`);
+    if (filter.maxUtilization !== undefined) conditions.push(`${UTILIZATION} <= ${params.add(filter.maxUtilization)}`);
     const extra = conditions.map((condition) => ` AND ${condition}`).join('');
+    const direction = filter.order === 'desc' ? 'DESC' : 'ASC';
 
     const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total ${QUOTA_FROM}${extra}`, params.values);
     const limit = params.add(window.limit);
     const offset = params.add(window.offset);
     const { rows } = await this.db.query<UserQuotaColumns>(
-      `${QUOTA_SELECT}${extra} ORDER BY u.external_user_id ASC, u.id ASC LIMIT ${limit} OFFSET ${offset}`,
+      `${QUOTA_SELECT}${extra} ORDER BY ${SORT_SQL[filter.sort ?? 'externalUserId']} ${direction}, u.id ${direction} LIMIT ${limit} OFFSET ${offset}`,
       params.values,
     );
     return { rows: rows.map(toQuotaRow), total: countResult.rows[0]?.total ?? 0 };
@@ -115,7 +127,7 @@ export class PostgresUserRepository implements UserRepository {
 
   async topByUtilization(accountId: string, period: QuotaPeriod, limit: number): Promise<UserQuotaRow[]> {
     const { rows } = await this.db.query<UserQuotaColumns>(
-      `${QUOTA_SELECT} ORDER BY ${utilizationSql('pv.monthly_allowance', CONSUMED)} DESC, u.id ASC LIMIT $3`,
+      `${QUOTA_SELECT} ORDER BY ${UTILIZATION} DESC, u.id ASC LIMIT $3`,
       [periodToDate(period), accountId, limit],
     );
     return rows.map(toQuotaRow);

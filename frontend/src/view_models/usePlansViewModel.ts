@@ -1,11 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { CreatePlanRequest, ListPlansParams, Plan, PlanKind, PlanScope, UpdatePlanRequest } from '@/models/plan';
-import { PLAN_KINDS, PLAN_SCOPES } from '@/models/plan';
+import type { CreatePlanRequest, Plan, UpdatePlanRequest } from '@/models/plan';
+import { listPlansQuerySchema } from '@/models/plan';
 import { useCredentials } from '@/hooks/useCredentials';
-import { useSearchParamState } from '@/hooks/useSearchParamState';
+import { useListQuery } from '@/hooks/useListQuery';
 import { useServices } from '@/providers/ServicesProvider';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
+
+export const PLAN_FILTER_FIELDS = ['search', 'scope', 'kind'] as const;
 
 export type PlanEditorState = { mode: 'create' } | { mode: 'edit'; plan: Plan } | null;
 
@@ -14,21 +16,12 @@ export function usePlansViewModel() {
   const queryClient = useQueryClient();
   const { account } = useCredentials();
   const accountId = account?.accountId ?? '';
-  const url = useSearchParamState();
-
-  const scopeParam = url.get('scope');
-  const kindParam = url.get('kind');
-  const params: ListPlansParams = {
-    page: url.getNumber('page', 1),
-    pageSize: 20,
-    scope: PLAN_SCOPES.includes(scopeParam as PlanScope) ? (scopeParam as PlanScope) : undefined,
-    kind: PLAN_KINDS.includes(kindParam as PlanKind) ? (kindParam as PlanKind) : undefined,
-  };
+  const list = useListQuery(listPlansQuerySchema, PLAN_FILTER_FIELDS, { pageSize: 20, order: 'asc' });
 
   const plans = useQuery({
-    queryKey: queryKeys.account.plans(accountId, params),
-    queryFn: () => services.plans.listPlans(params),
-    enabled: Boolean(account),
+    queryKey: queryKeys.account.plans(accountId, list.query ?? {}),
+    queryFn: () => services.plans.listPlans(list.query!),
+    enabled: Boolean(account) && list.isValid,
     staleTime: staleTimes.plans,
     placeholderData: keepPreviousData,
   });
@@ -74,10 +67,7 @@ export function usePlansViewModel() {
   });
 
   return {
-    params,
-    setScope: (scope: string) => url.set({ scope: scope || null }),
-    setKind: (kind: string) => url.set({ kind: kind || null }),
-    setPage: (page: number) => url.set({ page }),
+    list,
     plans,
     accountQuota: current.data?.quota ?? null,
     selectedPlanId,

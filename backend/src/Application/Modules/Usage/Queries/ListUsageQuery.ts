@@ -14,8 +14,22 @@ export class ListUsageQuery {
 
   async execute(input: ListUsageInput): Promise<PaginatedResponse<UsageRecord>> {
     const { rows, total } = await this.usage.list(
-      { accountId: input.accountId, externalUserId: input.userId, outcome: input.outcome, period: input.month, from: input.from, to: input.to },
+      {
+        accountId: input.accountId,
+        externalUserId: input.userId,
+        outcome: input.outcome,
+        period: input.month,
+        from: input.from,
+        to: input.to,
+        rule: input.rule,
+        level: input.level,
+        minUnits: input.minUnits,
+        maxUnits: input.maxUnits,
+        requestId: input.requestId,
+        replayed: input.replayed,
+      },
       pageWindow(input.page, input.pageSize),
+      { field: input.sort, order: input.order },
     );
     return toPage(rows, total, input.page, input.pageSize, (row) => row);
   }

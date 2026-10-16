@@ -1,18 +1,17 @@
 import { isMockMode } from '@/services/api/apiConfig';
-import { cn } from '@/utils/formatUtils';
+import type { AiScope } from '@/services/aiAdvisorService';
 import { useAiAdvisorViewModel } from '@/view_models/useAiAdvisorViewModel';
 import { AiQuestionPanel } from '@/widgets/ai/AiQuestionPanel';
 import { AiResponsePanel } from '@/widgets/ai/AiResponsePanel';
 import { SuggestedQuestions } from '@/widgets/ai/SuggestedQuestions';
-import { CredentialsGate } from '@/widgets/common/CredentialsGate';
 import { ErrorState } from '@/widgets/common/ErrorState';
 import { Skeleton } from '@/widgets/common/LoadingSkeleton';
 import { MonthSelect } from '@/widgets/common/MonthSelect';
 import { PageHeader } from '@/widgets/common/PageHeader';
 import { Card, CardBody, CardHeader } from '@/widgets/ui/Card';
 
-export default function AiAdvisorView() {
-  const vm = useAiAdvisorViewModel();
+function AiAdvisorContent({ scope }: { scope: AiScope }) {
+  const vm = useAiAdvisorViewModel(scope);
   return (
     <>
       <PageHeader
@@ -24,25 +23,10 @@ export default function AiAdvisorView() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <div role="tablist" aria-label="Advisor scope" className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-              {(['account', 'global'] as const).map((scope) => (
-                <button
-                  key={scope}
-                  role="tab"
-                  type="button"
-                  aria-selected={vm.scope === scope}
-                  onClick={() => vm.setScope(scope)}
-                  className={cn('rounded-md px-3 py-1.5 text-xs font-medium', vm.scope === scope ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100')}
-                >
-                  {scope === 'account' ? 'Connected account' : 'All accounts (operator)'}
-                </button>
-              ))}
-            </div>
             <MonthSelect value={vm.month} onChange={vm.setMonth} />
           </div>
         }
       />
-      <CredentialsGate scope={vm.scope === 'global' ? 'admin' : 'account'}>
         <div className="grid gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-2">
             <CardHeader title="Ask" description={vm.scope === 'global' ? 'Answers may cover every account.' : `Answers cover ${vm.accountName ?? 'the connected account'} only.`} />
@@ -74,7 +58,14 @@ export default function AiAdvisorView() {
             </CardBody>
           </Card>
         </div>
-      </CredentialsGate>
     </>
   );
+}
+
+export function OperatorAiAdvisorView() {
+  return <AiAdvisorContent scope="global" />;
+}
+
+export function AccountAiAdvisorView() {
+  return <AiAdvisorContent scope="account" />;
 }

@@ -2,7 +2,6 @@ import { Link } from 'react-router';
 import { routePaths } from '@/routing/routePaths';
 import { formatMonthLabel } from '@/utils/dateUtils';
 import { useDashboardViewModel } from '@/view_models/useDashboardViewModel';
-import { CredentialsGate } from '@/widgets/common/CredentialsGate';
 import { ErrorState } from '@/widgets/common/ErrorState';
 import { CardsSkeleton, ChartSkeleton, TableSkeleton } from '@/widgets/common/LoadingSkeleton';
 import { MonthSelect } from '@/widgets/common/MonthSelect';
@@ -47,7 +46,7 @@ function DashboardContent() {
               title="Recent activity"
               description="Latest accepted and rejected decisions across accounts"
               actions={
-                <Link to={routePaths.usage} className="text-xs font-medium text-brand-600 hover:underline">
+                <Link to={routePaths.operator.usage} className="text-xs font-medium text-brand-600 hover:underline">
                   View full history
                 </Link>
               }
@@ -78,8 +77,6 @@ function DashboardContent() {
 
 export default function DashboardView() {
   return (
-    <CredentialsGate scope="admin">
-      <DashboardContent />
-    </CredentialsGate>
+    <DashboardContent />
   );
 }

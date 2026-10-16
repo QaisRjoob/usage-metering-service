@@ -1,85 +1,37 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { DEFAULT_PAGE_SIZE } from '@/models/pagination';
-import type { AdminListUsageParams, UsageOutcome, UsageRecord } from '@/models/usage-record';
+import type { UsageRecord } from '@/models/usage-record';
+import { adminListUsageQuerySchema, listUsageQuerySchema } from '@/models/usage-record';
 import { useCredentials } from '@/hooks/useCredentials';
-import { useSearchParamState } from '@/hooks/useSearchParamState';
+import { useListQuery } from '@/hooks/useListQuery';
 import { useServices } from '@/providers/ServicesProvider';
-import { isValidIsoDate, isValidMonth } from '@/utils/dateUtils';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
-export type HistoryScope = 'account' | 'admin';
+export type HistoryScope = 'account' | 'operator';
 
-export interface UsageFiltersValue {
-  accountId?: string;
-  userId?: string;
-  outcome?: UsageOutcome;
-  month?: string;
-  from?: string;
-  to?: string;
-}
+const COMMON_FIELDS = ['userId', 'outcome', 'rule', 'level', 'minUnits', 'maxUnits', 'requestId', 'replayed', 'month', 'from', 'to'] as const;
+const OPERATOR_FIELDS = [...COMMON_FIELDS, 'accountId'] as const;
 
 /**
- * History is paginated and filtered on the server. Filters live in the URL so a filtered view can
- * be shared or reloaded. `scope=admin` shows all accounts (admin token); otherwise the connected
- * account's history (API key).
+ * Request history, filtered, sorted and paginated on the server. The account interface uses
+ * GET /usage (the account always comes from the API key); the operator interface uses
+ * GET /admin/usage with an optional account filter.
  */
-export function useUsageHistoryViewModel() {
+export function useUsageHistoryViewModel(scope: HistoryScope) {
   const services = useServices();
-  const creds = useCredentials();
-  const url = useSearchParamState();
-
-  const requestedScope = url.get('scope');
-  const scope: HistoryScope = requestedScope === 'admin' || (!creds.account && requestedScope !== 'account' && creds.adminToken) ? 'admin' : 'account';
-
-  const outcomeParam = url.get('outcome');
-  const filters: UsageFiltersValue = {
-    accountId: scope === 'admin' ? url.get('accountId') : undefined,
-    userId: url.get('userId'),
-    outcome: outcomeParam === 'accepted' || outcomeParam === 'rejected' ? outcomeParam : undefined,
-    month: isValidMonth(url.get('month')) ? url.get('month') : undefined,
-    from: isValidIsoDate(url.get('from')) ? url.get('from') : undefined,
-    to: isValidIsoDate(url.get('to')) ? url.get('to') : undefined,
-  };
-  const params: AdminListUsageParams = {
-    ...filters,
-    page: url.getNumber('page', 1),
-    pageSize: url.getNumber('pageSize', DEFAULT_PAGE_SIZE),
-  };
-  const rangeError = filters.from && filters.to && filters.from > filters.to ? '"From" must be on or before "To".' : null;
+  const { account } = useCredentials();
+  const accountList = useListQuery(listUsageQuerySchema, COMMON_FIELDS, { pageSize: 20, sort: 'createdAt', order: 'desc' });
+  const operatorList = useListQuery(adminListUsageQuerySchema, OPERATOR_FIELDS, { pageSize: 20, sort: 'createdAt', order: 'desc' });
+  const list = scope === 'operator' ? operatorList : accountList;
 
   const history = useQuery({
-    queryKey: scope === 'admin' ? queryKeys.admin.usage(params) : queryKeys.account.usage(creds.account?.accountId ?? '', params),
-    queryFn: () => (scope === 'admin' ? services.usage.getAdminUsageHistory(params) : services.usage.getUsageHistory(params)),
-    enabled: !rangeError && (scope === 'admin' ? Boolean(creds.adminToken) : Boolean(creds.account)),
+    queryKey: scope === 'operator' ? queryKeys.admin.usage(operatorList.query ?? {}) : queryKeys.account.usage(account?.accountId ?? '', accountList.query ?? {}),
+    queryFn: () => (scope === 'operator' ? services.usage.getAdminUsageHistory(operatorList.query!) : services.usage.getUsageHistory(accountList.query!)),
+    enabled: list.isValid,
     staleTime: staleTimes.usage,
     placeholderData: keepPreviousData,
   });
 
   const [selected, setSelected] = useState<UsageRecord | null>(null);
-
-  return {
-    scope,
-    setScope: (next: HistoryScope) => url.set({ scope: next, accountId: null }),
-    canUseAdmin: Boolean(creds.adminToken),
-    canUseAccount: Boolean(creds.account),
-    filters,
-    rangeError,
-    applyFilters: (next: UsageFiltersValue) =>
-      url.set({
-        accountId: next.accountId ?? null,
-        userId: next.userId ?? null,
-        outcome: next.outcome ?? null,
-        month: next.month ?? null,
-        from: next.from ?? null,
-        to: next.to ?? null,
-      }),
-    clearFilters: () => url.set({ accountId: null, userId: null, outcome: null, month: null, from: null, to: null }),
-    params,
-    setPage: (page: number) => url.set({ page }),
-    setPageSize: (pageSize: number) => url.set({ pageSize }),
-    history,
-    selected,
-    select: setSelected,
-  };
+  return { scope, list, history, selected, select: setSelected };
 }

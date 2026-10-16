@@ -1,22 +1,20 @@
 import { useState, type FormEvent } from 'react';
-import { Search } from 'lucide-react';
 import { quotaCheckRequestSchema } from '@/models/consumption';
-import { QUOTA_STATUSES, STATUS_LABELS } from '@/models/quota';
 import { describeError } from '@/services/api/apiErrors';
 import { formatMonthLabel } from '@/utils/dateUtils';
 import { parseNumberInput, validateWith, type FieldErrors } from '@/utils/validationUtils';
 import { useQuotaViewModel } from '@/view_models/useQuotaViewModel';
-import { CredentialsGate } from '@/widgets/common/CredentialsGate';
 import { ErrorState } from '@/widgets/common/ErrorState';
 import { Skeleton } from '@/widgets/common/LoadingSkeleton';
 import { PageHeader } from '@/widgets/common/PageHeader';
 import { PaginationControls } from '@/widgets/common/PaginationControls';
 import { DecisionCard } from '@/widgets/demo/DecisionCard';
 import { QuotaSnapshotCard } from '@/widgets/quotas/QuotaSnapshotCard';
+import { UserFilterBar } from '@/widgets/users/UserFilterBar';
 import { UsersTable } from '@/widgets/users/UsersTable';
 import { Button } from '@/widgets/ui/Button';
 import { Card, CardBody, CardHeader } from '@/widgets/ui/Card';
-import { Field, Input, Select } from '@/widgets/ui/Field';
+import { Field, Input } from '@/widgets/ui/Field';
 
 function DryRunCheck({ vm }: { vm: ReturnType<typeof useQuotaViewModel> }) {
   const [userId, setUserId] = useState('');
@@ -84,27 +82,24 @@ function QuotasContent() {
             </div>
           </div>
           <Card>
-            <CardHeader title="User quotas" description="Individual allowances. Users who share a plan still have separate totals." />
-            <div className="flex flex-wrap gap-3 border-b border-slate-100 p-4">
-              <label className="relative min-w-56 flex-1">
-                <span className="sr-only">Search users</span>
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <Input className="pl-9" placeholder="Search by user id or name" value={vm.searchDraft} onChange={(event) => vm.setSearchDraft(event.target.value)} />
-              </label>
-              <label className="sr-only" htmlFor="quota-status">
-                Status
-              </label>
-              <Select id="quota-status" className="w-48" value={vm.params.status ?? ''} onChange={(event) => vm.setStatus(event.target.value)}>
-                <option value="">All statuses</option>
-                {QUOTA_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <UsersTable users={data?.users.items} isLoading={vm.quotas.isPending || vm.quotas.isFetching} emptyHint="No users match these filters." />
-            {data && <PaginationControls {...data.users} onPageChange={vm.setPage} isFetching={vm.quotas.isFetching} />}
+            <CardHeader title="User quotas" description="Individual allowances, most-used first. Users who share a plan still have separate totals." />
+            <UserFilterBar list={vm.list} planOptions={vm.planOptions} planName={vm.planName} showMonth={false} totalItems={data?.users.totalItems} isFetching={vm.quotas.isFetching} />
+            {!vm.list.isValid ? (
+              <p role="alert" className="m-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                Fix the highlighted filter to see results.
+              </p>
+            ) : (
+              <>
+                <UsersTable
+                  users={data?.users.items}
+                  isLoading={vm.quotas.isPending || vm.quotas.isFetching}
+                  sort={{ field: vm.list.sort, order: vm.list.order }}
+                  onSort={vm.list.setSort}
+                  emptyHint="No users match these filters."
+                />
+                {data && <PaginationControls {...data.users} onPageChange={vm.list.setPage} onPageSizeChange={vm.list.setPageSize} isFetching={vm.quotas.isFetching} />}
+              </>
+            )}
           </Card>
         </div>
       )}
@@ -114,8 +109,6 @@ function QuotasContent() {
 
 export default function QuotasView() {
   return (
-    <CredentialsGate scope="account">
-      <QuotasContent />
-    </CredentialsGate>
+    <QuotasContent />
   );
 }

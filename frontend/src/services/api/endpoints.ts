@@ -9,6 +9,7 @@ export const endpoints = {
     accounts: '/admin/accounts',
     account: (accountId: string) => `/admin/accounts/${segment(accountId)}`,
     accountUsers: (accountId: string) => `/admin/accounts/${segment(accountId)}/users`,
+    plans: '/admin/plans',
     usage: '/admin/usage',
     analyticsSummary: '/admin/analytics/summary',
   },

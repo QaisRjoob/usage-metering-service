@@ -1,4 +1,5 @@
-import type { ListUsersParams, QuotasOverview } from '../../../../contracts';
+import type { QuotasOverview, quotasQuerySchema } from '../../../../contracts';
+import type { z } from 'zod';
 import { accountNotFound } from '../../../../Domain/Accounts/AccountErrors';
 import { periodOf } from '../../../../Domain/Quotas/QuotaPeriod';
 import type { Clock } from '../../../Common/Clock';
@@ -16,11 +17,24 @@ export class GetQuotasOverviewQuery {
     private readonly clock: Clock,
   ) {}
 
-  async execute(accountId: string, params: Required<Pick<ListUsersParams, 'page' | 'pageSize'>> & ListUsersParams): Promise<QuotasOverview> {
+  async execute(accountId: string, params: z.output<typeof quotasQuerySchema>): Promise<QuotasOverview> {
     const period = periodOf(this.clock.now());
     const [account, users] = await Promise.all([
       this.accounts.getQuotaRow(accountId, period),
-      this.users.list(accountId, { period, search: params.search, status: params.status }, pageWindow(params.page, params.pageSize)),
+      this.users.list(
+        accountId,
+        {
+          period,
+          search: params.search,
+          planId: params.planId,
+          status: params.status,
+          minUtilization: params.minUtilization,
+          maxUtilization: params.maxUtilization,
+          sort: params.sort,
+          order: params.order,
+        },
+        pageWindow(params.page, params.pageSize),
+      ),
     ]);
     if (!account) throw accountNotFound();
     return {

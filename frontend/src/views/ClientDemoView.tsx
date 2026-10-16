@@ -3,7 +3,6 @@ import { formatUtcDateTime } from '@/utils/dateUtils';
 import { cn } from '@/utils/formatUtils';
 import { formatUnits } from '@/utils/numberUtils';
 import { useClientDemoViewModel } from '@/view_models/useClientDemoViewModel';
-import { CredentialsGate } from '@/widgets/common/CredentialsGate';
 import { EmptyState } from '@/widgets/common/EmptyState';
 import { ErrorState } from '@/widgets/common/ErrorState';
 import { Skeleton } from '@/widgets/common/LoadingSkeleton';
@@ -163,8 +162,6 @@ function ClientDemoContent() {
 
 export default function ClientDemoView() {
   return (
-    <CredentialsGate scope="account">
-      <ClientDemoContent />
-    </CredentialsGate>
+    <ClientDemoContent />
   );
 }

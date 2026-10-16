@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { externalUserIdSchema, idSchema, monthSchema } from './common';
-import { paginationQuerySchema } from './pagination';
+import { externalUserIdSchema, idSchema, monthSchema, percentFilterSchema, rangeChecks, searchSchema } from './common';
+import { SORT_ORDERS, paginationQuerySchema } from './pagination';
 import type { Plan } from './plans';
 import { QUOTA_STATUSES, type QuotaSnapshot } from './quota';
 
@@ -32,10 +32,25 @@ export const createUserSchema = z.object({
 });
 export type CreateUserRequest = z.infer<typeof createUserSchema>;
 
-export const listUsersQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().max(128).optional(),
+export const USER_SORT_FIELDS = ['externalUserId', 'createdAt', 'utilization', 'consumed'] as const;
+export type UserSortField = (typeof USER_SORT_FIELDS)[number];
+
+const usersFilterFields = paginationQuerySchema.extend({
+  search: searchSchema(128),
   planId: idSchema.optional(),
   status: z.enum(QUOTA_STATUSES).optional(),
+  minUtilization: percentFilterSchema.optional(),
+  maxUtilization: percentFilterSchema.optional(),
   month: monthSchema.optional(),
+  sort: z.enum(USER_SORT_FIELDS).default('externalUserId'),
+  order: z.enum(SORT_ORDERS).default('asc'),
 });
+const userRanges = rangeChecks<{ minUtilization?: number; maxUtilization?: number }>([['minUtilization', 'maxUtilization']]);
+
+/** GET /users and GET /admin/accounts/:id/users query DTO (user-level quota of `month`). */
+export const listUsersQuerySchema = usersFilterFields.superRefine(userRanges);
 export type ListUsersParams = Partial<z.infer<typeof listUsersQuerySchema>>;
+
+/** GET /quotas query DTO: same filters, always the current month. */
+export const quotasQuerySchema = usersFilterFields.omit({ month: true }).superRefine(userRanges);
+export type QuotasQueryParams = Partial<z.infer<typeof quotasQuerySchema>>;

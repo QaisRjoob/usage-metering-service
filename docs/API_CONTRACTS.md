@@ -57,6 +57,11 @@ List endpoints take `page` (≥ 1, default 1) and `pageSize` (1–100, default 2
 
 Ordering is stable with a unique tie-breaker (history: `created_at DESC, id DESC`).
 
+Each list's filters, sort keys and ranges are defined by its query DTO schema in
+`backend/src/contracts` (`list*QuerySchema`, `quotasQuerySchema`). Sort keys are a whitelist; `min*`/`max*`
+and `from`/`to` pairs must not be reversed; an empty value means "no filter". Violations answer
+`400 VALIDATION_ERROR` with the offending field in `details[].path`.
+
 ## Shared shapes
 
 `QuotaSnapshot` — one level (account or user) for one month:
@@ -92,10 +97,11 @@ Rule evaluation order (first failure is `rejection`; all failures are in `violat
 | Method | Path | Request | Response |
 |---|---|---|---|
 | POST | `/admin/accounts` | `{ name, planId? }` (predefined account plan; default Starter) | `201 CreateAccountResponse { account, apiKey }` — the key is shown once |
-| GET | `/admin/accounts` | `page, pageSize, search?, status?, month?, sort=name\|createdAt\|utilization, order=asc\|desc` | `Paginated<AccountListItem>` |
+| GET | `/admin/accounts` | `page, pageSize, search?, status?, planId?, planKind?, minUtilization?, maxUtilization?, createdFrom?, createdTo?, month?, sort=name\|createdAt\|utilization\|consumed\|userCount, order=asc\|desc` | `Paginated<AccountListItem>` |
 | GET | `/admin/accounts/:accountId` | `month?` | `AccountDetails` |
-| GET | `/admin/accounts/:accountId/users` | `page, pageSize, search?, planId?, status?, month?` | `Paginated<UserWithQuota>` |
-| GET | `/admin/usage` | `page, pageSize, accountId?, userId?, outcome?, month?, from?, to?` | `Paginated<UsageRecord>` |
+| GET | `/admin/accounts/:accountId/users` | same query as `GET /users` | `Paginated<UserWithQuota>` |
+| GET | `/admin/plans` | `page, pageSize, search?, scope?, kind?, ownerAccountId?, sort?, order?` | `Paginated<AdminPlanListItem>` (plan + `ownerAccountName`, `assignedAccounts`, `assignedUsers`) |
+| GET | `/admin/usage` | same query as `GET /usage`, plus `accountId?` | `Paginated<UsageRecord>` |
 | GET | `/admin/analytics/summary` | `month` | `AdminAnalyticsSummary` |
 
 ### Account (API key)
@@ -104,19 +110,19 @@ Rule evaluation order (first failure is `rejection`; all failures are in `violat
 | GET | `/account` | — | `CurrentAccountResponse { account, plan, quota }` |
 | PUT | `/account/plan` | `{ planId }` (account-scope plan) | `CurrentAccountResponse` |
 | GET | `/account/usage-summary` | `month?` | `AccountUsageSummary` |
-| GET | `/users` | `page, pageSize, search?, planId?, status?, month?` | `Paginated<UserWithQuota>` |
+| GET | `/users` | `page, pageSize, search?, planId?, status?, minUtilization?, maxUtilization?, month?, sort=externalUserId\|createdAt\|utilization\|consumed, order` | `Paginated<UserWithQuota>` |
 | POST | `/users` | `{ externalUserId, displayName?, planId? }` (default Basic) | `201 UserWithQuota` |
 | GET | `/users/:userId` | — | `UserDetails { user, plan, quota, accountQuota }` |
 | PUT | `/users/:userId/plan` | `{ planId }` (user-scope plan) | `UserDetails` |
 | GET | `/users/:userId/usage-summary` | `month?` | `UserUsageSummary` |
-| GET | `/plans` | `page, pageSize, scope?, kind=predefined\|custom` | `Paginated<Plan>` (predefined + own custom) |
+| GET | `/plans` | `page, pageSize, search?, scope?, kind=predefined\|custom, sort?=name\|createdAt\|monthlyAllowance\|maxUnitsPerRequest, order` | `Paginated<Plan>` (predefined + own custom; no sort = predefined first) |
 | POST | `/plans` | `{ name, description?, scope, monthlyAllowance, maxUnitsPerRequest }` | `201 PlanDetails` |
 | GET | `/plans/:planId` | — | `PlanDetails` (with all versions) |
 | PATCH | `/plans/:planId` | any of `{ name, description, monthlyAllowance, maxUnitsPerRequest }` | `PlanDetails`; limit changes create a new version; predefined → `403 PLAN_READ_ONLY` |
-| GET | `/quotas` | `page, pageSize, search?, status?` | `QuotasOverview { period, account, users: Paginated<UserWithQuota> }` |
+| GET | `/quotas` | same filters and sort as `GET /users`, without `month` (always the current month) | `QuotasOverview { period, account, users: Paginated<UserWithQuota> }` |
 | POST | `/quotas/check` | `{ userId, units }` | `QuotaCheckResult` — dry run, never mutates or records |
 | POST | `/usage/consume` | `{ userId, units, requestId }` | `ConsumeDecision` (200 for accepted and rejected) |
-| GET | `/usage` | `page, pageSize, userId?, outcome?, month?, from?, to?` | `Paginated<UsageRecord>` |
+| GET | `/usage` | `page, pageSize, userId?, outcome?, rule?, level?, minUnits?, maxUnits?, requestId?` (substring), `replayed?` (true/false), `month?, from?, to?, sort=createdAt\|units, order` | `Paginated<UsageRecord>` |
 | GET | `/usage/:usageId` | — | `UsageRecord` |
 
 `:userId` is always the caller's `externalUserId`.

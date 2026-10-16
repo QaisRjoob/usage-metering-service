@@ -1,5 +1,5 @@
 /** MOCK ADAPTER - implements QuotaService against the in-memory mock database. */
-import { listUsersQuerySchema, quotaCheckRequestSchema } from '@/contracts';
+import { quotaCheckRequestSchema, quotasQuerySchema } from '@/contracts';
 import type { QuotaService } from '@/services/quotaService';
 import { filteredUsers, pageOf, requireAccount, simulate, validate } from './mockRuntime';
 
@@ -8,7 +8,7 @@ export function createMockQuotaService(): QuotaService {
     getQuotas: (params) =>
       simulate((db) => {
         const account = requireAccount(db);
-        const query = validate(listUsersQuerySchema, params);
+        const query = validate(quotasQuerySchema, params);
         const period = db.currentPeriod();
         return {
           period,

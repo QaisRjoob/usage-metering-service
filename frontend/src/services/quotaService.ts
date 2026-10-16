@@ -1,10 +1,10 @@
 import type { QuotaCheckRequest, QuotaCheckResult } from '@/models/consumption';
 import type { QuotasOverview } from '@/models/quota';
-import type { ListUsersParams } from '@/models/user';
+import type { QuotasQueryParams } from '@/models/user';
 import { apiRequest } from './api/apiClient';
 import { endpoints } from './api/endpoints';
 
-export type QuotasParams = Pick<ListUsersParams, 'page' | 'pageSize' | 'search' | 'status'>;
+export type QuotasParams = QuotasQueryParams;
 
 /** Account scope. */
 export interface QuotaService {

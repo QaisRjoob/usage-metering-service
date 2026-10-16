@@ -3,17 +3,16 @@ import type { UsageRecord } from '@/models/usage-record';
 import { LEVEL_LABELS, RULE_LABELS } from '@/models/quota';
 import { formatUtcDateTime } from '@/utils/dateUtils';
 import { formatUnits } from '@/utils/numberUtils';
-import { useUsageHistoryViewModel } from '@/view_models/useUsageHistoryViewModel';
-import { CredentialsGate } from '@/widgets/common/CredentialsGate';
+import { useUsageHistoryViewModel, type HistoryScope } from '@/view_models/useUsageHistoryViewModel';
 import { ErrorState } from '@/widgets/common/ErrorState';
 import { PageHeader } from '@/widgets/common/PageHeader';
 import { UsageFilters } from '@/widgets/usage/UsageFilters';
 import { UsagePagination } from '@/widgets/usage/UsagePagination';
 import { UsageTable } from '@/widgets/usage/UsageTable';
 import { OutcomeBadge } from '@/widgets/usage/OutcomeBadge';
+import { Button } from '@/widgets/ui/Button';
 import { Card } from '@/widgets/ui/Card';
 import { Dialog } from '@/widgets/ui/Dialog';
-import { cn } from '@/utils/formatUtils';
 
 function RecordDetails({ record }: { record: UsageRecord }) {
   const rows: [string, ReactNode][] = [
@@ -43,46 +42,49 @@ function RecordDetails({ record }: { record: UsageRecord }) {
   );
 }
 
-function UsageHistoryContent() {
-  const vm = useUsageHistoryViewModel();
-  const hasFilters = Object.values(vm.filters).some(Boolean);
+function UsageHistoryContent({ scope }: { scope: HistoryScope }) {
+  const vm = useUsageHistoryViewModel(scope);
+  const { list } = vm;
   return (
     <>
       <PageHeader
         title="Usage history"
-        description="Every consume request with its outcome, the rule and level that rejected it, and the plan versions that governed the decision. Newest first."
-        actions={
-          (vm.canUseAdmin || vm.canUseAccount) && (
-            <div role="tablist" aria-label="History scope" className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-              {(['account', 'admin'] as const).map((scope) => (
-                <button
-                  key={scope}
-                  role="tab"
-                  type="button"
-                  aria-selected={vm.scope === scope}
-                  onClick={() => vm.setScope(scope)}
-                  className={cn('rounded-md px-3 py-1.5 text-xs font-medium', vm.scope === scope ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100')}
-                >
-                  {scope === 'account' ? 'Connected account' : 'All accounts (operator)'}
-                </button>
-              ))}
-            </div>
-          )
+        description={
+          scope === 'operator'
+            ? 'Every consume request across all accounts: outcome, the rule and level that rejected it, and the plan versions that decided it. Filter by account, user, outcome, rule, units, request id, replays and dates.'
+            : 'Every consume request of your account: outcome, the rule and level that rejected it, and the plan versions that decided it. Click a row for all details.'
         }
       />
-      <CredentialsGate scope={vm.scope}>
-        <Card>
-          <UsageFilters key={JSON.stringify(vm.filters)} value={vm.filters} showAccountFilter={vm.scope === 'admin'} rangeError={vm.rangeError} onApply={vm.applyFilters} onClear={vm.clearFilters} />
-          {vm.history.error && !vm.history.data ? (
-            <ErrorState className="m-4" error={vm.history.error} onRetry={() => void vm.history.refetch()} />
-          ) : (
-            <>
-              <UsageTable records={vm.history.data?.items} isLoading={vm.history.isPending || vm.history.isFetching} onSelect={vm.select} hasFilters={hasFilters} />
-              {vm.history.data && <UsagePagination page={vm.history.data} onPageChange={vm.setPage} onPageSizeChange={vm.setPageSize} isFetching={vm.history.isFetching} />}
-            </>
-          )}
-        </Card>
-      </CredentialsGate>
+      <Card>
+        <UsageFilters list={list} showAccountFilter={scope === 'operator'} totalItems={vm.history.data?.totalItems} isFetching={vm.history.isFetching} />
+        {!list.isValid ? (
+          <p role="alert" className="m-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            Fix the highlighted filter to see results.
+          </p>
+        ) : vm.history.error && !vm.history.data ? (
+          <ErrorState className="m-4" error={vm.history.error} onRetry={() => void vm.history.refetch()} />
+        ) : (
+          <>
+            <UsageTable
+              records={vm.history.data?.items}
+              isLoading={vm.history.isPending || vm.history.isFetching}
+              onSelect={vm.select}
+              hasFilters={list.activeCount > 0}
+              showAccount={scope === 'operator'}
+              sort={{ field: list.sort, order: list.order }}
+              onSort={list.setSort}
+              emptyAction={
+                list.activeCount > 0 ? (
+                  <Button variant="outline" size="sm" onClick={list.clearAll}>
+                    Clear all filters
+                  </Button>
+                ) : undefined
+              }
+            />
+            {vm.history.data && <UsagePagination page={vm.history.data} onPageChange={list.setPage} onPageSizeChange={list.setPageSize} isFetching={vm.history.isFetching} />}
+          </>
+        )}
+      </Card>
       <Dialog open={vm.selected !== null} onClose={() => vm.select(null)} title="Usage record" size="lg">
         {vm.selected && <RecordDetails record={vm.selected} />}
       </Dialog>
@@ -90,6 +92,10 @@ function UsageHistoryContent() {
   );
 }
 
-export default function UsageHistoryView() {
-  return <UsageHistoryContent />;
+export function OperatorUsageHistoryView() {
+  return <UsageHistoryContent scope="operator" />;
+}
+
+export function AccountUsageHistoryView() {
+  return <UsageHistoryContent scope="account" />;
 }

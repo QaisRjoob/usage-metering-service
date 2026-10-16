@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { MAX_MONTHLY_ALLOWANCE, MAX_UNITS_PER_REQUEST_INPUT, idSchema } from './common';
-import { paginationQuerySchema } from './pagination';
+import { MAX_MONTHLY_ALLOWANCE, MAX_UNITS_PER_REQUEST_INPUT, idSchema, searchSchema } from './common';
+import { SORT_ORDERS, paginationQuerySchema } from './pagination';
 
 export const PLAN_SCOPES = ['account', 'user'] as const;
 export type PlanScope = (typeof PLAN_SCOPES)[number];
@@ -77,8 +77,29 @@ export type UpdatePlanRequest = z.infer<typeof updatePlanSchema>;
 export const assignPlanSchema = z.object({ planId: idSchema });
 export type AssignPlanRequest = z.infer<typeof assignPlanSchema>;
 
+/** No sort given = predefined first, then scope, then name. */
+export const PLAN_SORT_FIELDS = ['name', 'createdAt', 'monthlyAllowance', 'maxUnitsPerRequest'] as const;
+export type PlanSortField = (typeof PLAN_SORT_FIELDS)[number];
+
+/** GET /plans query DTO: predefined plans plus the caller's own custom plans. */
 export const listPlansQuerySchema = paginationQuerySchema.extend({
+  search: searchSchema(80),
   scope: z.enum(PLAN_SCOPES).optional(),
   kind: z.enum(PLAN_KINDS).optional(),
+  sort: z.enum(PLAN_SORT_FIELDS).optional(),
+  order: z.enum(SORT_ORDERS).default('asc'),
 });
 export type ListPlansParams = Partial<z.infer<typeof listPlansQuerySchema>>;
+
+/** GET /admin/plans query DTO: every plan, including each account's custom plans. */
+export const adminListPlansQuerySchema = listPlansQuerySchema.extend({
+  ownerAccountId: idSchema.optional(),
+});
+export type AdminListPlansParams = Partial<z.infer<typeof adminListPlansQuerySchema>>;
+
+/** Row of the operator's plan catalogue. Assignment counts are across all accounts. */
+export interface AdminPlanListItem extends Plan {
+  ownerAccountName: string | null;
+  assignedAccounts: number;
+  assignedUsers: number;
+}

@@ -1,8 +1,7 @@
 # User Guide — trying the app in the browser
 
-This guide explains what the app is and walks you through every page of the web interface. No
-programming is needed: you only click and read. For setup details and the API itself, see the
-[README](../README.md).
+This guide explains what the app is and walks you through both web interfaces. No programming is
+needed: you only click and read. For setup details and the API itself, see the [README](../README.md).
 
 ---
 
@@ -41,15 +40,16 @@ same moment, the limits are never exceeded.
 | **Remaining** | Units still available this month. Never below 0. |
 | **Request ID** | A label the calling tool attaches to each request. Sending the same ID again repeats the original answer instead of consuming again. |
 
-### Two kinds of people use the web app
+### Two kinds of people, two separate interfaces
 
-| Role | Signs in with | Pages |
+| Role | Signs in with | Their interface |
 |---|---|---|
-| **Operator** (runs the service) | the **admin token** | Dashboard, Accounts, history across all accounts, AI Advisor for all accounts |
-| **Account** (a company using the service) | that account's **API key** | Plans, Quotas, Client Demo, its own history, AI Advisor for its own data |
+| **Operator** — the people running the service | the **admin token** | the **Operator console** (`/admin`): every company, plan catalogue, history across companies |
+| **Company** — a business using the service | its account **API key** | the **Account portal** (`/app`): its own users, plans, quotas, history, and the Client Demo |
 
-The **Client Demo** page pretends to be the company's document-processing tool, so you can watch the
-service make decisions.
+Each role only ever sees its own interface. A company owner cannot open operator pages and the
+operator cannot open a company's portal; trying it simply sends you back to your own home page.
+Only one role is signed in at a time.
 
 ---
 
@@ -82,37 +82,55 @@ docker compose up -d
 | Credential | Value | Where it comes from |
 |---|---|---|
 | Admin token (operator) | `local-admin-token-change-me` | set in `docker-compose.yml` (`ADMIN_API_TOKEN`) |
-| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | created automatically at startup for the account **Demo Docs Inc** |
+| Demo company API key | `umk_demo_local_only_do_not_use_in_production` | created automatically at startup for the company **Demo Docs Inc** |
 
 These are public example values for trying the app on your own computer only.
 
 ---
 
-## 3. The screen layout
+## 3. Signing in
 
-- **Left sidebar** — the pages, in three groups: *Operator* (Dashboard, Accounts), *Account* (Plans,
-  Quotas, Client Demo) and *Insights* (Usage history, AI Advisor). On a phone it opens from the ☰ button.
-- **Top bar** — shows whether an operator token and an account key are connected, and the
-  **Credentials** button to connect or disconnect them at any time.
-- When a page needs a credential you have not entered yet, it shows a small form instead of the page
-  (*"Operator access required"* or *"Connect an account"*). Enter the value and press **Connect**.
+The app opens on the **login page**. It has two tabs:
 
-Credentials are kept only in this browser tab. Closing the tab forgets them.
+- **Company account** — paste an API key (or click **Use seeded demo key**) and press **Sign in as
+  company account**. You land in the Account portal.
+- **Operator** — paste the admin token and press **Sign in as operator**. You land in the Operator
+  console.
+
+The header always shows who you are (the company name, or *Operator*) and a **Sign out** button.
+Signing in with one role signs you out of the other. Credentials are kept only in this browser tab.
 
 ---
 
-## 4. Guided tour (about 10 minutes)
+## 4. Finding things: filters, sorting and pages
 
-Follow these steps in order on a fresh demo. Each step says what to do and what you should see.
+Every list (accounts, users, plans, quotas, usage history) has the same filter area on top:
 
-### Step 1 — Connect the demo account
+- a **search box** — results update as you pause typing;
+- **quick filter buttons** — one click, e.g. *All / Healthy / Approaching limit / Exhausted / Over
+  allowance*, or *All requests / Accepted / Rejected* and *User limit / Account limit*;
+- **More filters** — opens a panel with the advanced fields (plan, plan type, utilization range,
+  units range, request id, replays, month, date ranges, account…). The button shows how many of them
+  are active;
+- **chips** under the filters — one per active filter, each with an **×** to remove it, plus **Clear
+  all**, and the number of results;
+- **sortable columns** — click a column title with ↕ to sort; click again to reverse (↑ / ↓ shows the
+  direction);
+- **pages** at the bottom — previous/next and how many rows per page (10, 20, 50, 100).
 
-1. Click **Client Demo** in the sidebar.
-2. In the *Connect an account* box, click **Use seeded demo key**, then **Connect**.
-3. The top bar now shows **Demo Docs Inc**.
+Filtering, sorting and paging all happen on the server, so they stay fast with lots of data. The
+filters are part of the page address: you can bookmark or share a filtered view. If a filter is
+impossible (for example a minimum bigger than the maximum), the field is marked and nothing is
+loaded until you fix it.
 
-The demo account uses a deliberately small shared plan, **Demo Shared Pool**: 100 units per month,
-at most 100 per request. It has three users:
+---
+
+## 5. Guided tour of the Account portal (about 10 minutes)
+
+Sign in as **Company account** with the demo key. Follow these steps in order on a fresh demo.
+
+The demo company **Demo Docs Inc** uses a deliberately small shared plan, **Demo Shared Pool**: 100
+units per month, at most 100 per request. It has three users:
 
 | User | Plan | Personal limits |
 |---|---|---|
@@ -120,14 +138,15 @@ at most 100 per request. It has three users:
 | `bob` | Premium | 10,000 per month, at most 200 per request |
 | `carol` | Basic | 1,000 per month, at most 20 per request |
 
-### Step 2 — Run the scenario on the Client Demo page
+### Step 1 — Run the Client Demo
 
-The page has three parts:
-- **Client application** (left) — the pretend document tool: choose a user, a document type (each
-  type costs a number of units) or type units, then **Process document**.
+Click **Client Demo** in the sidebar. The page pretends to be the company's document tool:
+
+- **Client application** (left) — choose a user, a document type or a number of units, then
+  **Process document**.
 - **Decision** (right) — the service's answer, and two cards side by side: **Account remaining
   (shared)** and **User remaining**. The card of the rule that blocked a request is outlined in red.
-- **Guided scenario** — five steps with **Run** buttons that fill in the right user and units for you.
+- **Guided scenario** — five steps with **Run** buttons.
 
 Press **Run** on each step:
 
@@ -135,116 +154,60 @@ Press **Run** on each step:
 |---|---|---|---|
 | 1 | alice, 10 units (invoice) | **Accepted** | Both plans allow it. Account: 90 of 100 left. alice: 990 of 1,000 left. |
 | 2 | alice, 25 units (contract) | **Rejected** — *Max units per request*, **User (individual)** | Basic allows at most 20 per request. Nothing was counted. |
-| 3 | bob, 95 units (annual report) | **Rejected** — *Monthly allowance*, **Account (shared)** | Only 90 shared units are left. bob personally still has 10,000 — the shared limit is what blocks him. |
+| 3 | bob, 95 units (annual report) | **Rejected** — *Monthly allowance*, **Account (shared)** | Only 90 shared units are left. bob personally still has 10,000 — the shared limit blocks him. |
 
-### Step 3 — Change a plan and repeat
+### Step 2 — Change a plan and repeat
 
-Below the decision, the **Plan changes (account configuration)** panel acts like the company's
-settings screen:
+In the **Plan changes** panel on the same page, keep *alice* and *Premium* selected and click
+**Switch plan**. Then press **Run** on step 2 again: now it is **Accepted**. The client did not
+change — only the plan did. (Alternatively raise the shared plan's allowance under **Edit the shared
+account plan** and repeat step 3.)
 
-1. Under **Switch a user's plan**, keep *alice* and *Premium* selected and click **Switch plan**.
-2. Press **Run** on scenario step 2 again (alice, 25 units).
-3. Now it is **Accepted**. The client code did not change — only the plan did. alice keeps the 10 units
-   she already used this month; switching plans never gives a fresh allowance.
+### Step 3 — Send the same request twice
 
-(Alternatively, under **Edit the shared account plan**, raise the monthly allowance, for example to
-1000, click **Save allowance**, and repeat step 3 — bob's 95 units are then accepted.)
+Click **Retry same request**. You should see **Accepted** with the badge **Idempotent replay ·
+nothing consumed again**, and the remaining numbers do not go down. All five checklist items are now ✓.
 
-### Step 4 — Send the same request twice
+### Step 4 — The other account pages
 
-Click **Retry same request**. This re-sends exactly the last request, with the same request ID —
-what a real tool does after a network timeout.
-
-You should see **Accepted** with the badge **Idempotent replay · nothing consumed again**. The
-remaining numbers do not go down. All five checklist items are now ticked ✓.
-
-The **Request log (this session)** at the bottom lists everything you sent.
-
----
-
-## 5. The other pages
-
-### Quotas (account)
-
-Shows the connected account's **shared quota** for the current month and, below, every user's
-**individual quota**: monthly allowance, used, remaining, a progress bar and a status badge.
-
-| Badge | Meaning |
+| Page | What you can do |
 |---|---|
-| Healthy | below 80 % used |
-| Approaching limit | 80 % or more used |
-| Exhausted | nothing left this month |
-| Over allowance | the allowance was lowered below what was already used (remaining shows 0) |
-
-**Check a request (dry run)** answers *"would this be allowed?"* without using any units and without
-recording anything. Try user `alice` with `30` units.
-
-### Plans (account)
-
-Lists the four predefined plans (marked **Predefined**, with a lock — read-only) and the account's
-custom plans. Filter by **Type** (predefined/custom) and **Scope** (account/user).
-
-- **New custom plan** — give it a name, choose *User plan (individual limits)* or *Account plan
-  (shared limits)*, and set the monthly allowance and the max units per request.
-- **Edit** (custom plans only) — changing a limit creates a new version that applies to the next
-  request immediately. If you **lower** a monthly allowance, the app asks you to confirm, because
-  users who already used more will be blocked until next month.
-- **Versions** — the history of a plan's limits. Old decisions keep the version that was in force.
-
-### Usage history (account or operator)
-
-Every request with its outcome. At the top choose **Connected account** or **All accounts
-(operator)**. Filter by user, outcome (accepted/rejected), month, and a date range, then **Apply
-filters**. Each row shows the time (UTC), user, request ID, units requested/used, the outcome, the
-rule and level of a rejection, and the plan versions used. Click a row to see every detail. Pages of
-10–100 rows; previous months are available.
-
-### Dashboard (operator)
-
-Click **Dashboard** and enter the admin token `local-admin-token-change-me`. It shows, for the chosen
-month (**Month (UTC)** selector):
-
-- **Units consumed**, accepted and rejected requests;
-- **Allocated** — the sum of all account plans' monthly allowances, and how much is left;
-- **Overall utilization**;
-- **Accounts ≥ 80 %** — accounts close to or over their limit;
-- a daily **Usage trend** chart, a **Quota utilization** chart of the most-used accounts, **Recent
-  activity**, and **Monthly totals** for the last six months.
-
-### Accounts (operator)
-
-All accounts with their plan, usage this month, utilization and status. Search by name or ID, filter
-by status, sort, and page through the list.
-
-**Create account**: enter a name, choose Starter or Pro, and click **Create account**. The new
-**API key is shown only once** — copy it. **Use this key in this tab** connects you as that account
-right away; **I have stored the key** closes the window.
-
-Click an account to open its **details**: its plan and quota, request counts, its users with their
-quotas, and recent requests. Use the **Month (UTC)** selector to look at earlier months. Registering
-users and changing plans require that account's own API key — click **Connect this account's key**
-(after creating an account you are already connected). Then **Register user**, **Change plan** (per
-user) and **Change account plan** become available.
-
-Try it: create an account, register a user, then go to **Client Demo** and process documents for that
-user.
-
-### AI Advisor (account or operator)
-
-Ask questions about usage in plain language, or click a suggested question such as *"Which users are
-closest to their individual limits?"*. Choose **Connected account** (answers about that account only)
-or **All accounts (operator)**. The answer shows the period and the data it used. In the default setup
-the answers come from a built-in **mock** advisor (clearly labelled) that restates the service's own
-numbers; a real AI model can be enabled with an OpenAI key (see the README).
+| **Overview** | Your shared quota, this month's accepted/rejected requests, a daily usage chart, *why requests were rejected* (click a reason to open the matching history), and the users closest to their limits. **Change account plan** switches your shared plan. Pick another **Month (UTC)** to look back. |
+| **Users** | All your users with plan, usage, remaining and status. Filter by status, plan, utilization or month; sort by name, usage or utilization. **Register user** adds a user; **Change plan** switches a user's plan (units already used this month are kept). |
+| **Plans** | Predefined plans (locked, read-only) and your custom plans. Search, filter by type and scope, sort by name or limits. **New custom plan**, **Edit** (creates a new version; lowering an allowance asks for confirmation) and **Versions** (history of limits). |
+| **Quotas** | Your shared quota and each user's quota, most-used first, with the same user filters. **Check a request (dry run)** answers "would this be allowed?" without using units. |
+| **Usage history** | Every request with outcome, rule, level, units and plan versions. Try: **Rejected** + **User limit**; *Units requested* 50 – 100 under **More filters**; *Retried: Replayed at least once*; a date range. Click a row for all details. |
+| **AI Advisor** | Ask questions about your usage or click a suggestion. In the default setup a built-in **mock** advisor answers (clearly labelled). |
 
 ---
 
-## 6. Troubleshooting
+## 6. Tour of the Operator console
+
+Sign out, then sign in as **Operator** with `local-admin-token-change-me`.
+
+| Page | What you can do |
+|---|---|
+| **Overview** | Totals for the chosen month across all companies: units consumed, allocated units, overall utilization, companies at ≥ 80 %, daily trend, most-used companies, recent activity and six-month totals. |
+| **Accounts** | Every company with plan, users, usage, utilization and status. Quick status buttons; **More filters**: plan, plan type (predefined/custom), utilization range, creation date range, month. Sort by name, users, usage, utilization or creation date. **Create account** issues a new API key — it is **shown only once**; copy it and give it to the company. Click a company to open its details. |
+| **Account details** | Read-only view of one company: its shared quota, request counts, its users (with the same user filters) and recent requests. **Full history with filters** opens that company's history. Changes to users and plans are made by the company in its own portal. |
+| **Plan catalogue** | Every plan in the service — predefined and each company's custom plans — with the owner and how many accounts/users use it. Filter by type, scope or owner account; sort by name, limits or creation date. |
+| **Usage history** | All requests across companies with the same filters as the company history, plus an **Account** picker (type part of a company name). |
+| **AI Advisor** | Questions about all companies, e.g. *"Which accounts are closest to exhausting their quotas?"* |
+
+Try it end to end: create an account in **Accounts**, copy its key, sign out, sign in as **Company
+account** with that key, register a user in **Users**, and process documents for that user in
+**Client Demo**.
+
+---
+
+## 7. Troubleshooting
 
 | Problem | Fix |
 |---|---|
 | The page does not open | Make sure Docker Desktop is running and the three containers are started (`docker compose up -d`). |
-| "Invalid API key" / "Invalid admin token" | Check the value for typos; the demo values are in §2. |
+| "Invalid API key" / "Invalid admin token" | Check the value for typos; the demo values are in §2. Make sure you picked the right tab (Company account vs Operator). |
+| I typed an operator address but landed on my company overview | That is the role separation working: sign out and sign in as Operator. |
+| "Fix the highlighted filter to see results" | A filter is impossible (e.g. minimum above maximum, end date before start date). Correct or remove it. |
+| No rows, but I expected some | Look at the chips under the filters and remove some, or press **Clear all**. |
 | Step 3 of the scenario is accepted instead of rejected | The shared pool was already used by earlier tries. Start fresh with `docker compose down -v` then `docker compose up -d`, and run the steps in order. |
-| A page asks for a credential again | Credentials live only in the current tab; reconnect with the **Credentials** button. |
 | "Too many requests" | The AI Advisor allows 10 questions per minute; wait a minute. |

@@ -102,6 +102,12 @@ export interface UsageFilter {
   month?: string;
   from?: string;
   to?: string;
+  rule?: RuleViolation['rule'];
+  level?: RuleLevel;
+  minUnits?: number;
+  maxUnits?: number;
+  requestId?: string;
+  replayed?: boolean;
 }
 
 function notFound(code: (typeof ERROR_CODES)[keyof typeof ERROR_CODES], message: string): ApiError {
@@ -544,13 +550,29 @@ export class MockDatabase {
       const day = row.createdAt.slice(0, 10);
       if (filter.from && day < filter.from) return false;
       if (filter.to && day > filter.to) return false;
+      const rejection = row.violations[0];
+      if (filter.rule && rejection?.rule !== filter.rule) return false;
+      if (filter.level && rejection?.level !== filter.level) return false;
+      if (filter.minUnits !== undefined && row.unitsRequested < filter.minUnits) return false;
+      if (filter.maxUnits !== undefined && row.unitsRequested > filter.maxUnits) return false;
+      if (filter.requestId && !row.requestId.toLowerCase().includes(filter.requestId.toLowerCase())) return false;
+      if (filter.replayed !== undefined && (row.replayCount > 0) !== filter.replayed) return false;
       return true;
     });
   }
 
   /** Newest first with id as tie-breaker, like `ORDER BY created_at DESC, id DESC`. */
-  listUsage(filter: UsageFilter, page: number, pageSize: number): PaginatedResponse<UsageRecord> {
-    const rows = this.filterRequests(filter).sort((a, b) => (a.createdAt === b.createdAt ? b.id.localeCompare(a.id) : b.createdAt.localeCompare(a.createdAt)));
+  /** Same ordering as the API: created_at (or units, then newest) with id as tie-breaker. */
+  listUsage(filter: UsageFilter, page: number, pageSize: number, sort: { field: 'createdAt' | 'units'; order: 'asc' | 'desc' } = { field: 'createdAt', order: 'desc' }): PaginatedResponse<UsageRecord> {
+    const direction = sort.order === 'asc' ? 1 : -1;
+    const newestFirst = (a: RequestRow, b: RequestRow) => (a.createdAt === b.createdAt ? b.id.localeCompare(a.id) : b.createdAt.localeCompare(a.createdAt));
+    const rows = this.filterRequests(filter).sort((a, b) =>
+      sort.field === 'units'
+        ? (a.unitsRequested - b.unitsRequested) * direction || newestFirst(a, b)
+        : sort.order === 'asc'
+          ? -newestFirst(a, b)
+          : newestFirst(a, b),
+    );
     const items = rows.slice((page - 1) * pageSize, page * pageSize).map((row) => this.usageRecordDto(row));
     return buildPage(items, page, pageSize, rows.length);
   }

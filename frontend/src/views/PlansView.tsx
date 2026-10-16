@@ -3,27 +3,32 @@ import type { Plan } from '@/models/plan';
 import { formatUtcDateTime } from '@/utils/dateUtils';
 import { formatUnits } from '@/utils/numberUtils';
 import { usePlansViewModel } from '@/view_models/usePlansViewModel';
-import { CredentialsGate } from '@/widgets/common/CredentialsGate';
 import { DataTable, type Column } from '@/widgets/common/DataTable';
 import { EmptyState } from '@/widgets/common/EmptyState';
 import { ErrorState } from '@/widgets/common/ErrorState';
 import { TableSkeleton } from '@/widgets/common/LoadingSkeleton';
 import { PageHeader } from '@/widgets/common/PageHeader';
 import { PaginationControls } from '@/widgets/common/PaginationControls';
+import { buildChips } from '@/widgets/filters/chips';
+import { FilterBar } from '@/widgets/filters/FilterBar';
+import { SegmentedFilter } from '@/widgets/filters/FilterFields';
 import { PlanForm } from '@/widgets/forms/PlanForm';
 import { Badge } from '@/widgets/ui/Badge';
 import { Button } from '@/widgets/ui/Button';
 import { Card } from '@/widgets/ui/Card';
 import { Dialog } from '@/widgets/ui/Dialog';
-import { Select } from '@/widgets/ui/Field';
 
 function PlansContent() {
   const vm = usePlansViewModel();
+  const { list } = vm;
+  const f = list.filters;
 
   const columns: Column<Plan>[] = [
     {
       key: 'name',
       header: 'Plan',
+      sortKey: 'name',
+      firstOrder: 'asc',
       cell: (plan) => (
         <div>
           <p className="font-medium text-slate-900">{plan.name}</p>
@@ -45,8 +50,8 @@ function PlansContent() {
         ),
       hideBelow: 'sm',
     },
-    { key: 'monthly', header: 'Monthly allowance', cell: (plan) => formatUnits(plan.currentVersion.monthlyAllowance), align: 'right' },
-    { key: 'perRequest', header: 'Max / request', cell: (plan) => formatUnits(plan.currentVersion.maxUnitsPerRequest), align: 'right' },
+    { key: 'monthly', header: 'Monthly allowance', sortKey: 'monthlyAllowance', cell: (plan) => formatUnits(plan.currentVersion.monthlyAllowance), align: 'right' },
+    { key: 'perRequest', header: 'Max / request', sortKey: 'maxUnitsPerRequest', cell: (plan) => formatUnits(plan.currentVersion.maxUnitsPerRequest), align: 'right' },
     { key: 'version', header: 'Version', cell: (plan) => `v${plan.currentVersion.version}`, hideBelow: 'md' },
     { key: 'updated', header: 'Updated (UTC)', cell: (plan) => <span className="whitespace-nowrap text-xs">{formatUtcDateTime(plan.updatedAt)}</span>, hideBelow: 'lg' },
     {
@@ -73,7 +78,7 @@ function PlansContent() {
     <>
       <PageHeader
         title="Plans"
-        description="Predefined plans are seeded at startup and read-only. Custom plans belong to the connected account only. Every limit change creates a new immutable version."
+        description="Predefined plans are read-only. Your custom plans are private to your account; every limit change creates a new version. Search, filter and click a column to sort."
         actions={
           <Button onClick={vm.openCreate}>
             <Plus className="size-4" aria-hidden="true" /> New custom plan
@@ -81,24 +86,45 @@ function PlansContent() {
         }
       />
       <Card>
-        <div className="flex flex-wrap gap-3 border-b border-slate-100 p-4">
-          <label className="text-xs font-medium text-slate-600">
-            <span className="mb-1 block">Type</span>
-            <Select className="h-9 w-40" value={vm.params.kind ?? ''} onChange={(event) => vm.setKind(event.target.value)}>
-              <option value="">All plans</option>
-              <option value="predefined">Predefined</option>
-              <option value="custom">Custom</option>
-            </Select>
-          </label>
-          <label className="text-xs font-medium text-slate-600">
-            <span className="mb-1 block">Scope</span>
-            <Select className="h-9 w-40" value={vm.params.scope ?? ''} onChange={(event) => vm.setScope(event.target.value)}>
-              <option value="">Account and user</option>
-              <option value="account">Account plans</option>
-              <option value="user">User plans</option>
-            </Select>
-          </label>
-        </div>
+        <FilterBar
+          search={{ value: f.search ?? '', onChange: (value) => list.set({ search: value }), placeholder: 'Search plan name or description', label: 'Search plans' }}
+          quick={
+            <>
+              <SegmentedFilter
+                label="Plan type"
+                value={(f.kind as 'predefined' | 'custom' | undefined) ?? ''}
+                onChange={(value) => list.set({ kind: value })}
+                options={[
+                  { value: '', label: 'All plans' },
+                  { value: 'predefined', label: 'Predefined' },
+                  { value: 'custom', label: 'My custom plans' },
+                ]}
+              />
+              <SegmentedFilter
+                label="Scope"
+                value={(f.scope as 'account' | 'user' | undefined) ?? ''}
+                onChange={(value) => list.set({ scope: value })}
+                options={[
+                  { value: '', label: 'Account and user' },
+                  { value: 'account', label: 'Account plans' },
+                  { value: 'user', label: 'User plans' },
+                ]}
+              />
+            </>
+          }
+          chips={buildChips(
+            f,
+            [
+              { key: 'search', label: 'Search' },
+              { key: 'kind', label: 'Type' },
+              { key: 'scope', label: 'Scope' },
+            ],
+            list.set,
+          )}
+          onClearAll={list.clearAll}
+          totalItems={vm.plans.data?.totalItems}
+          isFetching={vm.plans.isFetching}
+        />
         {vm.plans.error && !vm.plans.data ? (
           <ErrorState className="m-4" error={vm.plans.error} onRetry={() => void vm.plans.refetch()} />
         ) : (
@@ -109,9 +135,11 @@ function PlansContent() {
               rows={vm.plans.data?.items}
               getRowKey={(plan) => plan.id}
               isLoading={vm.plans.isPending || vm.plans.isFetching}
-              empty={<EmptyState title="No plans match" description="Create a custom plan or change the filters." />}
+              sort={{ field: list.sort, order: list.order }}
+              onSort={list.setSort}
+              empty={<EmptyState title="No plans match" description="Create a custom plan or change the filters." action={list.activeCount > 0 ? <Button variant="outline" size="sm" onClick={list.clearAll}>Clear all filters</Button> : undefined} />}
             />
-            {vm.plans.data && <PaginationControls {...vm.plans.data} onPageChange={vm.setPage} isFetching={vm.plans.isFetching} />}
+            {vm.plans.data && <PaginationControls {...vm.plans.data} onPageChange={list.setPage} onPageSizeChange={list.setPageSize} isFetching={vm.plans.isFetching} />}
           </>
         )}
       </Card>
@@ -162,9 +190,5 @@ function PlansContent() {
 }
 
 export default function PlansView() {
-  return (
-    <CredentialsGate scope="account">
-      <PlansContent />
-    </CredentialsGate>
-  );
+  return <PlansContent />;
 }

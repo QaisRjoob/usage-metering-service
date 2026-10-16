@@ -1,4 +1,4 @@
-import { adminListUsageQuerySchema, createAccountSchema, listAccountsQuerySchema, listUsersQuerySchema } from '../../contracts';
+import { adminListPlansQuerySchema, adminListUsageQuerySchema, createAccountSchema, listAccountsQuerySchema, listUsersQuerySchema } from '../../contracts';
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../../container';
 import { accountNotFound } from '../../Domain/Accounts/AccountErrors';
@@ -33,6 +33,8 @@ export function registerAdminRoutes(app: FastifyInstance, container: Container):
       if (!(await container.accounts.exists(accountId))) throw accountNotFound();
       return container.users.list.execute(accountId, query);
     });
+
+    admin.get('/admin/plans', async (request) => container.plans.listAll.execute(validate(adminListPlansQuerySchema, request.query)));
 
     admin.get('/admin/usage', async (request) => container.usage.list.execute(validate(adminListUsageQuerySchema, request.query)));
 

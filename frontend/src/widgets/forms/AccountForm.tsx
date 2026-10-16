@@ -69,9 +69,8 @@ export function AccountForm({ onSubmit, submitting, error, onCancel }: AccountFo
 }
 
 /** Shows the raw API key exactly once, with a copy button and a clear warning. */
-export function IssuedApiKey({ result, onConnect, onDone }: { result: CreateAccountResponse; onConnect: () => void; onDone: () => void }) {
+export function IssuedApiKey({ result, onDone }: { result: CreateAccountResponse; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
-  const [connected, setConnected] = useState(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(result.apiKey);
@@ -87,7 +86,7 @@ export function IssuedApiKey({ result, onConnect, onDone }: { result: CreateAcco
       </p>
       <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <p>Copy this API key now. It is stored only as a hash and cannot be shown again.</p>
+        <p>Copy this API key now and give it to the company. It is stored only as a hash and cannot be shown again. The company signs in to its own portal with it.</p>
       </div>
       <div className="flex items-center gap-2">
         <code className="min-w-0 flex-1 break-all rounded-lg bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-300" aria-label="Issued API key">
@@ -99,16 +98,6 @@ export function IssuedApiKey({ result, onConnect, onDone }: { result: CreateAcco
         </Button>
       </div>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button
-          variant="outline"
-          onClick={() => {
-            onConnect();
-            setConnected(true);
-          }}
-          disabled={connected}
-        >
-          {connected ? 'Connected in this tab' : 'Use this key in this tab'}
-        </Button>
         <Button onClick={onDone}>I have stored the key</Button>
       </div>
     </div>

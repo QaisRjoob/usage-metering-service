@@ -1,4 +1,5 @@
 import {
+  adminListPlansQuerySchema,
   adminListUsageQuerySchema,
   aiAdvisorRequestSchema,
   assignPlanSchema,
@@ -11,10 +12,11 @@ import {
   listUsageQuerySchema,
   listUsersQuerySchema,
   quotaCheckRequestSchema,
+  quotasQuerySchema,
   updatePlanSchema,
 } from '../../contracts';
 import { z, type ZodObject, type ZodType } from 'zod';
-import { monthQuery, quotasQuery } from '../Schemas/params';
+import { monthQuery } from '../Schemas/params';
 
 /**
  * OpenAPI 3.1 document served at /api/v1/openapi.json (Swagger UI at /docs).
@@ -48,6 +50,7 @@ const routes: RouteDoc[] = [
   { method: 'get', path: '/admin/accounts', tag: 'Operator', summary: 'List accounts with their account quota', security: 'admin', query: listAccountsQuerySchema, response: 'Page<AccountListItem>' },
   { method: 'get', path: '/admin/accounts/{accountId}', tag: 'Operator', summary: 'Account details for a month', security: 'admin', params: ['accountId'], query: monthQuery, response: 'Object' },
   { method: 'get', path: '/admin/accounts/{accountId}/users', tag: 'Operator', summary: "An account's users with their quota", security: 'admin', params: ['accountId'], query: listUsersQuerySchema, response: 'Page<UserWithQuota>' },
+  { method: 'get', path: '/admin/plans', tag: 'Operator', summary: 'Plan catalogue: predefined and every account’s custom plans', security: 'admin', query: adminListPlansQuerySchema, response: 'Page<Plan>' },
   { method: 'get', path: '/admin/usage', tag: 'Operator', summary: 'Request history across accounts', security: 'admin', query: adminListUsageQuerySchema, response: 'Page<UsageRecord>' },
   { method: 'get', path: '/admin/analytics/summary', tag: 'Operator', summary: 'Dashboard metrics across accounts', security: 'admin', query: monthQuery, response: 'Object' },
 
@@ -66,7 +69,7 @@ const routes: RouteDoc[] = [
   { method: 'get', path: '/plans/{planId}', tag: 'Plans', summary: 'Plan with all versions', security: 'apiKey', params: ['planId'], response: 'Plan' },
   { method: 'patch', path: '/plans/{planId}', tag: 'Plans', summary: 'Update a custom plan (limit changes create a new version; predefined â†’ 403)', security: 'apiKey', params: ['planId'], body: updatePlanSchema, response: 'Plan' },
 
-  { method: 'get', path: '/quotas', tag: 'Quotas', summary: 'Account quota and a page of user quotas (current month)', security: 'apiKey', query: quotasQuery, response: 'Object' },
+  { method: 'get', path: '/quotas', tag: 'Quotas', summary: 'Account quota and a page of user quotas (current month)', security: 'apiKey', query: quotasQuerySchema, response: 'Object' },
   { method: 'post', path: '/quotas/check', tag: 'Quotas', summary: 'Dry run: evaluate without consuming or recording', security: 'apiKey', body: quotaCheckRequestSchema, response: 'QuotaCheckResult' },
 
   { method: 'post', path: '/usage/consume', tag: 'Usage', summary: 'Consume units if both plans allow it (idempotent by requestId)', security: 'apiKey', body: consumeRequestSchema, response: 'ConsumeDecision' },

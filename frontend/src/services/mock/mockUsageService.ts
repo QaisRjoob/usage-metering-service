@@ -10,9 +10,23 @@ export function createMockUsageService(): UsageService {
         const account = requireAccount(db);
         const query = validate(listUsageQuerySchema, params);
         return db.listUsage(
-          { accountId: account.id, externalUserId: query.userId, outcome: query.outcome, month: query.month, from: query.from, to: query.to },
+{
+            accountId: account.id,
+            externalUserId: query.userId,
+            outcome: query.outcome,
+            month: query.month,
+            from: query.from,
+            to: query.to,
+            rule: query.rule,
+            level: query.level,
+            minUnits: query.minUnits,
+            maxUnits: query.maxUnits,
+            requestId: query.requestId,
+            replayed: query.replayed,
+          },
           query.page,
           query.pageSize,
+          { field: query.sort, order: query.order },
         );
       }),
 
@@ -21,9 +35,23 @@ export function createMockUsageService(): UsageService {
         requireAdmin();
         const query = validate(adminListUsageQuerySchema, params);
         return db.listUsage(
-          { accountId: query.accountId, externalUserId: query.userId, outcome: query.outcome, month: query.month, from: query.from, to: query.to },
+{
+            accountId: query.accountId,
+            externalUserId: query.userId,
+            outcome: query.outcome,
+            month: query.month,
+            from: query.from,
+            to: query.to,
+            rule: query.rule,
+            level: query.level,
+            minUnits: query.minUnits,
+            maxUnits: query.maxUnits,
+            requestId: query.requestId,
+            replayed: query.replayed,
+          },
           query.page,
           query.pageSize,
+          { field: query.sort, order: query.order },
         );
       }),
 

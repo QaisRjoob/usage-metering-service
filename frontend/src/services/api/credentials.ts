@@ -61,6 +61,15 @@ function update(next: CredentialsState): void {
   listeners.forEach((listener) => listener());
 }
 
+/** Who is signed in. Exactly one role at a time: an operator or one account (company). */
+export type SessionRole = 'operator' | 'account';
+
+export function roleOf(current: CredentialsState): SessionRole | null {
+  if (current.adminToken) return 'operator';
+  if (current.account) return 'account';
+  return null;
+}
+
 export const credentials = {
   get(): CredentialsState {
     return state;
@@ -69,12 +78,16 @@ export const credentials = {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
+  /** Signs in as the operator. Any account session is ended: the roles never mix. */
   setAdminToken(token: string | null): void {
-    update({ ...state, adminToken: token?.trim() || null });
+    const adminToken = token?.trim() || null;
+    update({ adminToken, account: adminToken ? null : state.account });
   },
+  /** Signs in as an account (company). Any operator session is ended. */
   setAccount(account: AccountCredential | null): void {
-    update({ ...state, account });
+    update({ adminToken: account ? null : state.adminToken, account });
   },
+  /** Sign out. */
   clearAll(): void {
     update(EMPTY_STATE);
   },
