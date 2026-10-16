@@ -90,12 +90,15 @@ These are public example values for trying the app on your own computer only.
 
 ## 3. Signing in
 
-The app opens on the **login page**. It has two tabs:
+The app opens on the **login page**, which has a single field: **Access token or API key**. Paste
+what you were given and press **Sign in** — you do not choose a role. The service recognises the
+token and opens the right interface:
 
-- **Company account** — paste an API key (or click **Use seeded demo key**) and press **Sign in as
-  company account**. You land in the Account portal.
-- **Operator** — paste the admin token and press **Sign in as operator**. You land in the Operator
-  console.
+- a **company API key** (it starts with `umk_`) opens that company's **Account portal**;
+- the **operator token** opens the **Operator console**.
+
+For the local demo there is a **Use demo company key** button. An unknown token is refused with one
+message ("This is neither a valid API key nor the operator token") and nothing is stored.
 
 The header always shows who you are (the company name, or *Operator*) and a **Sign out** button.
 Signing in with one role signs you out of the other. Credentials are kept only in this browser tab.
@@ -127,7 +130,7 @@ loaded until you fix it.
 
 ## 5. Guided tour of the Account portal (about 10 minutes)
 
-Sign in as **Company account** with the demo key. Follow these steps in order on a fresh demo.
+Sign in with the demo company key (`umk_demo_local_only_do_not_use_in_production`, or the **Use demo company key** button). Follow these steps in order on a fresh demo.
 
 The demo company **Demo Docs Inc** uses a deliberately small shared plan, **Demo Shared Pool**: 100
 units per month, at most 100 per request. It has three users:
@@ -183,7 +186,7 @@ nothing consumed again**, and the remaining numbers do not go down. All five che
 
 ## 6. Tour of the Operator console
 
-Sign out, then sign in as **Operator** with `local-admin-token-change-me`.
+Sign out, then sign in with the operator token `local-admin-token-change-me`.
 
 | Page | What you can do |
 |---|---|
@@ -194,8 +197,8 @@ Sign out, then sign in as **Operator** with `local-admin-token-change-me`.
 | **Usage history** | All requests across companies with the same filters as the company history, plus an **Account** picker (type part of a company name). |
 | **AI Advisor** | Questions about all companies, e.g. *"Which accounts are closest to exhausting their quotas?"* |
 
-Try it end to end: create an account in **Accounts**, copy its key, sign out, sign in as **Company
-account** with that key, register a user in **Users**, and process documents for that user in
+Try it end to end: create an account in **Accounts**, copy its key, sign out, sign in with that
+key, register a user in **Users**, and process documents for that user in
 **Client Demo**.
 
 ---
@@ -205,7 +208,7 @@ account** with that key, register a user in **Users**, and process documents for
 | Problem | Fix |
 |---|---|
 | The page does not open | Make sure Docker Desktop is running and the three containers are started (`docker compose up -d`). |
-| "Invalid API key" / "Invalid admin token" | Check the value for typos; the demo values are in §2. Make sure you picked the right tab (Company account vs Operator). |
+| "This is neither a valid API key nor the operator token" | Check the value for typos and copy it again without extra characters; the demo values are in §2. |
 | I typed an operator address but landed on my company overview | That is the role separation working: sign out and sign in as Operator. |
 | "Fix the highlighted filter to see results" | A filter is impossible (e.g. minimum above maximum, end date before start date). Correct or remove it. |
 | No rows, but I expected some | Look at the chips under the filters and remove some, or press **Clear all**. |

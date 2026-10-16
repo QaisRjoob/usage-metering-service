@@ -10,9 +10,5 @@ export function createMockAnalyticsService(): AnalyticsService {
         requireAdmin();
         return db.adminSummary(validate(monthSchema, month));
       }),
-    verifyAdminToken: (token) =>
-      simulate(() => {
-        requireAdmin(token);
-      }),
   };
 }

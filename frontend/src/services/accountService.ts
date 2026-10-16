@@ -22,8 +22,6 @@ export interface AccountService {
   createAccount(request: CreateAccountRequest): Promise<CreateAccountResponse>;
   /** Account scope: the account identified by the connected API key. */
   getCurrentAccount(): Promise<CurrentAccountResponse>;
-  /** Account scope: validates a key before it is stored as the connected credential. */
-  verifyApiKey(apiKey: string): Promise<CurrentAccountResponse>;
   /** Account scope: assigns or switches the account plan. */
   assignAccountPlan(planId: string): Promise<CurrentAccountResponse>;
 }
@@ -36,7 +34,6 @@ export function createHttpAccountService(): AccountService {
       apiRequest(endpoints.admin.accountUsers(accountId), { auth: 'admin', query: { ...params } }),
     createAccount: (request) => apiRequest(endpoints.admin.accounts, { method: 'POST', auth: 'admin', body: request }),
     getCurrentAccount: () => apiRequest(endpoints.account.current, { auth: 'account' }),
-    verifyApiKey: (apiKey) => apiRequest(endpoints.account.current, { auth: { apiKey } }),
     assignAccountPlan: (planId) => apiRequest(endpoints.account.plan, { method: 'PUT', auth: 'account', body: { planId } }),
   };
 }

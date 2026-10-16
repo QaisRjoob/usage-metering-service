@@ -10,3 +10,4 @@ export * from './consumption';
 export * from './analytics';
 export * from './ai';
 export * from './seed';
+export * from './auth';

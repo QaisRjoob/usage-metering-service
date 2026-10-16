@@ -30,6 +30,8 @@ const envSchema = z
     AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
     /** POST /admin/accounts per minute per client IP. */
     ACCOUNT_CREATE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(30),
+    /** POST /auth/identify (login) attempts per minute per client IP. */
+    LOGIN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(20),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === 'openai') {

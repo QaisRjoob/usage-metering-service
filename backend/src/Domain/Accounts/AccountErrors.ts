@@ -5,3 +5,4 @@ export const apiKeyMissing = () => new AppError('API_KEY_MISSING', 'Missing API 
 export const apiKeyInvalid = () => new AppError('API_KEY_INVALID', 'Invalid API key.');
 export const adminTokenMissing = () => new AppError('ADMIN_TOKEN_MISSING', 'Missing admin token. Send Authorization: Bearer <token>.');
 export const adminTokenInvalid = () => new AppError('ADMIN_TOKEN_INVALID', 'Invalid admin token.');
+export const credentialInvalid = () => new AppError('CREDENTIAL_INVALID', 'This is neither a valid API key nor the operator token.');

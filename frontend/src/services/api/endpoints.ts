@@ -3,6 +3,10 @@ const segment = (value: string): string => encodeURIComponent(value);
 
 export const endpoints = {
   health: '/health',
+
+  auth: {
+    identify: '/auth/identify',
+  },
   ready: '/ready',
 
   admin: {

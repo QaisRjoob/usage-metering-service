@@ -78,8 +78,6 @@ export function createMockAccountService(): AccountService {
 
     getCurrentAccount: () => simulate((db) => currentAccount(db, requireAccount(db))),
 
-    verifyApiKey: (apiKey) => simulate((db) => currentAccount(db, requireAccount(db, apiKey))),
-
     assignAccountPlan: (planId) =>
       simulate((db) => {
         const account = requireAccount(db);

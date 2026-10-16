@@ -1,9 +1,11 @@
 import { createHttpAccountService, type AccountService } from './accountService';
 import { createHttpAiAdvisorService, type AiAdvisorService } from './aiAdvisorService';
+import { createHttpAuthService, type AuthService } from './authService';
 import { createHttpAnalyticsService, type AnalyticsService } from './analyticsService';
 import { apiConfig, type DataSource } from './api/apiConfig';
 import { createMockAccountService } from './mock/mockAccountService';
 import { createMockAiAdvisorService } from './mock/mockAiAdvisorService';
+import { createMockAuthService } from './mock/mockAuthService';
 import { createMockAnalyticsService } from './mock/mockAnalyticsService';
 import { createMockPlanService } from './mock/mockPlanService';
 import { createMockQuotaService } from './mock/mockQuotaService';
@@ -17,6 +19,7 @@ import { createHttpUserService, type UserService } from './userService';
 /** Every service the views use. Mock and HTTP implementations share these interfaces. */
 export interface Services {
   dataSource: DataSource;
+  auth: AuthService;
   accounts: AccountService;
   users: UserService;
   plans: PlanService;
@@ -30,6 +33,7 @@ export function createServices(dataSource: DataSource = apiConfig.dataSource): S
   if (dataSource === 'mock') {
     return {
       dataSource,
+      auth: createMockAuthService(),
       accounts: createMockAccountService(),
       users: createMockUserService(),
       plans: createMockPlanService(),
@@ -41,6 +45,7 @@ export function createServices(dataSource: DataSource = apiConfig.dataSource): S
   }
   return {
     dataSource,
+    auth: createHttpAuthService(),
     accounts: createHttpAccountService(),
     users: createHttpUserService(),
     plans: createHttpPlanService(),

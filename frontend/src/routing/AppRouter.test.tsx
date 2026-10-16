@@ -63,7 +63,7 @@ describe('role separation', () => {
 
   it('sends anonymous visitors to the login page', async () => {
     renderWithProviders(<AppRouter />, { route: '/app/plans' });
-    expect(await screen.findByRole('tab', { name: /Company account/ })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByLabelText('Access token or API key')).toBeInTheDocument();
   });
 
   it('signing in as one role ends the other session', () => {
@@ -75,38 +75,46 @@ describe('role separation', () => {
   });
 });
 
-describe('login page', () => {
-  it('rejects an invalid admin token, then signs in and opens the requested operator page', async () => {
+describe('single-field login (the server decides the interface)', () => {
+  const field = () => screen.findByLabelText('Access token or API key');
+  const signIn = () => screen.getByRole('button', { name: /^Sign in$/ });
+
+  it('opens the operator console for the operator token, on the page that was requested', async () => {
     const user = userEvent.setup();
     renderWithProviders(<AppRouter />, { route: '/admin/plans' });
-    expect(await screen.findByRole('tab', { name: /Operator/ })).toHaveAttribute('aria-selected', 'true');
-    const input = screen.getByLabelText('Admin token');
-    await user.type(input, 'wrong-token');
-    await user.click(screen.getByRole('button', { name: /Sign in as operator/ }));
-    expect(await screen.findByText('Invalid admin token.')).toBeInTheDocument();
-    await user.clear(input);
-    await user.type(input, MOCK_ADMIN_TOKEN);
-    await user.click(screen.getByRole('button', { name: /Sign in as operator/ }));
+    await user.type(await field(), MOCK_ADMIN_TOKEN);
+    await user.click(signIn());
     expect(await screen.findByRole('heading', { level: 1, name: 'Plan catalogue' })).toBeInTheDocument();
+    expect(credentials.get().adminToken).toBe(MOCK_ADMIN_TOKEN);
   });
 
-  it('signs a company in with its API key and signs it out again', async () => {
+  it('opens the account portal for a company API key, and signs out again', async () => {
     const user = userEvent.setup();
     renderWithProviders(<AppRouter />, { route: '/login' });
-    await user.type(await screen.findByLabelText('Account API key'), DEMO_API_KEY);
-    await user.click(screen.getByRole('button', { name: /Sign in as company account/ }));
+    await user.type(await field(), DEMO_API_KEY);
+    await user.click(signIn());
     expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Demo Docs Inc' })).toBeInTheDocument();
+    expect(credentials.get().account?.accountName).toBe('Demo Docs Inc');
     await user.click(screen.getByRole('button', { name: /Sign out/ }));
-    expect(await screen.findByRole('tab', { name: /Company account/ })).toBeInTheDocument();
+    expect(await field()).toBeInTheDocument();
     expect(credentials.get().account).toBeNull();
   });
 
-  it('rejects an unknown API key', async () => {
+  it('ignores a requested page that belongs to the other interface', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AppRouter />, { route: '/admin/accounts' });
+    await user.type(await field(), DEMO_API_KEY);
+    await user.click(signIn());
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Demo Docs Inc' })).toBeInTheDocument();
+  });
+
+  it('rejects an unknown token with one generic message and stores nothing', async () => {
     const user = userEvent.setup();
     renderWithProviders(<AppRouter />, { route: '/login' });
-    await user.type(await screen.findByLabelText('Account API key'), 'umk_live_not_a_real_key');
-    await user.click(screen.getByRole('button', { name: /Sign in as company account/ }));
-    expect(await screen.findByText('Invalid API key.')).toBeInTheDocument();
+    await user.type(await field(), 'umk_live_not_a_real_key_at_all');
+    await user.click(signIn());
+    expect(await screen.findByText('This is neither a valid API key nor the operator token.')).toBeInTheDocument();
+    expect(credentials.get()).toEqual({ adminToken: null, account: null });
   });
 });
 

@@ -4,6 +4,7 @@ import type { AIProvider } from './Application/Modules/AI/Interfaces/AIProvider'
 import { AssignAccountPlanCommand } from './Application/Modules/Accounts/Commands/AssignAccountPlanCommand';
 import { CreateAccountCommand } from './Application/Modules/Accounts/Commands/CreateAccountCommand';
 import { AuthenticateApiKeyQuery } from './Application/Modules/Accounts/Queries/AuthenticateApiKeyQuery';
+import { IdentifyCredentialQuery } from './Application/Modules/Accounts/Queries/IdentifyCredentialQuery';
 import { GetAccountDetailsQuery } from './Application/Modules/Accounts/Queries/GetAccountDetailsQuery';
 import { GetCurrentAccountQuery } from './Application/Modules/Accounts/Queries/GetCurrentAccountQuery';
 import { ListAccountsQuery } from './Application/Modules/Accounts/Queries/ListAccountsQuery';
@@ -24,6 +25,7 @@ import { RegisterUserCommand } from './Application/Modules/Users/Commands/Regist
 import { GetUserQuery } from './Application/Modules/Users/Queries/GetUserQuery';
 import { ListUsersQuery } from './Application/Modules/Users/Queries/ListUsersQuery';
 import type { AppConfig } from './config/env';
+import { safeEqual } from './Shared/Middleware/auth';
 import type { Pool } from './Infrastructure/Database/postgres';
 import { PostgresTransactionManager, createRepositories } from './Infrastructure/Database/transaction-manager';
 import { CachedApiKeyAccountRepository } from './Infrastructure/Repositories/CachedApiKeyAccountRepository';
@@ -51,6 +53,7 @@ export function createContainer(options: ContainerOptions) {
   const analytics = new PostgresAnalyticsRepository(pool);
   const aiProvider = options.aiProvider ?? createAIProvider(config);
 
+  const authenticate = new AuthenticateApiKeyQuery(new CachedApiKeyAccountRepository(repos.accounts));
   const accountUsageSummary = new GetAccountUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
   const adminAnalytics = new GetAdminAnalyticsQuery(analytics, repos.accounts, repos.usage, clock);
 
@@ -60,7 +63,8 @@ export function createContainer(options: ContainerOptions) {
     clock,
     aiProvider,
     accounts: {
-      authenticate: new AuthenticateApiKeyQuery(new CachedApiKeyAccountRepository(repos.accounts)),
+      authenticate,
+      identify: new IdentifyCredentialQuery(authenticate, (token) => safeEqual(token, config.ADMIN_API_TOKEN)),
       create: new CreateAccountCommand(repos.accounts, repos.plans, clock),
       assignPlan: new AssignAccountPlanCommand(transactions, clock),
       getCurrent: new GetCurrentAccountQuery(repos.accounts, repos.plans, clock),

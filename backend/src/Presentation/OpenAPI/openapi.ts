@@ -4,6 +4,7 @@ import {
   aiAdvisorRequestSchema,
   assignPlanSchema,
   consumeRequestSchema,
+  identifyCredentialSchema,
   createAccountSchema,
   createPlanSchema,
   createUserSchema,
@@ -46,6 +47,7 @@ const routes: RouteDoc[] = [
   { method: 'get', path: '/health', tag: 'Health', summary: 'Liveness', security: 'none', response: 'Status' },
   { method: 'get', path: '/ready', tag: 'Health', summary: 'Readiness (checks PostgreSQL)', security: 'none', response: 'Status' },
 
+  { method: 'post', path: '/auth/identify', tag: 'Auth', summary: 'Login helper: tells whether a token is the admin token (operator) or an account API key', security: 'none', body: identifyCredentialSchema, response: 'Object' },
   { method: 'post', path: '/admin/accounts', tag: 'Operator', summary: 'Create an account; the API key is returned once', security: 'admin', body: createAccountSchema, status: 201, response: 'CreateAccountResponse' },
   { method: 'get', path: '/admin/accounts', tag: 'Operator', summary: 'List accounts with their account quota', security: 'admin', query: listAccountsQuerySchema, response: 'Page<AccountListItem>' },
   { method: 'get', path: '/admin/accounts/{accountId}', tag: 'Operator', summary: 'Account details for a month', security: 'admin', params: ['accountId'], query: monthQuery, response: 'Object' },
@@ -214,6 +216,7 @@ export function buildOpenApiDocument(serverUrl: string): Record<string, unknown>
     };
     if (route.body || route.query || route.params) responses['400'] = errorResponse('Validation error');
     if (route.security !== 'none') responses['401'] = errorResponse('Missing or invalid credential');
+    if (route.path === '/auth/identify') responses['401'] = errorResponse('CREDENTIAL_INVALID: neither the admin token nor a known API key');
     if (route.params) responses['404'] = errorResponse('Not found (including resources of other accounts)');
     if (route.path === '/usage/consume') responses['409'] = errorResponse('IDEMPOTENCY_KEY_REUSED');
     if (route.path.startsWith('/plans/') && route.method === 'patch') responses['403'] = errorResponse('PLAN_READ_ONLY');

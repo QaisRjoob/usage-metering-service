@@ -37,7 +37,7 @@ Every non-2xx response has this body:
 | Status | Codes |
 |---|---|
 | 400 | `VALIDATION_ERROR` (`details` = `[{ path, message }]`) |
-| 401 | `API_KEY_MISSING`, `API_KEY_INVALID`, `ADMIN_TOKEN_MISSING`, `ADMIN_TOKEN_INVALID` |
+| 401 | `API_KEY_MISSING`, `API_KEY_INVALID`, `ADMIN_TOKEN_MISSING`, `ADMIN_TOKEN_INVALID`, `CREDENTIAL_INVALID` (login) |
 | 403 | `PLAN_READ_ONLY` (predefined plans cannot be edited) |
 | 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `USER_NOT_FOUND`, `PLAN_NOT_FOUND`, `USAGE_RECORD_NOT_FOUND` |
 | 409 | `USER_ALREADY_EXISTS`, `PLAN_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED` |
@@ -92,6 +92,14 @@ Rule evaluation order (first failure is `rejection`; all failures are in `violat
 |---|---|---|
 | GET | `/health` | liveness |
 | GET | `/ready` | readiness (checks PostgreSQL) |
+
+### Login helper (no credential header)
+| Method | Path | Request | Response |
+|---|---|---|---|
+| POST | `/auth/identify` | `{ token }` (any pasted token, trimmed, 1–512 chars) | `{ role: "operator" }` for the admin token, `{ role: "account", account: { id, name, apiKeyPrefix } }` for an API key; anything else → `401 CREDENTIAL_INVALID`. Rate-limited per IP (LOGIN_RATE_LIMIT_PER_MINUTE, default 20). |
+
+The login page uses it to open the right interface from one field. It does not create a session or
+cookie: the client then sends the token as `Authorization: Bearer` (operator) or `X-API-Key` (account).
 
 ### Operator (admin token)
 | Method | Path | Request | Response |

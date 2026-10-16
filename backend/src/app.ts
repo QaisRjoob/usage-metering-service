@@ -10,6 +10,7 @@ import { buildOpenApiDocument } from './Presentation/OpenAPI/openapi';
 import { registerAccountRoutes } from './Presentation/Routes/accounts.routes';
 import { registerAdminRoutes } from './Presentation/Routes/admin.routes';
 import { registerAiRoutes } from './Presentation/Routes/ai.routes';
+import { registerAuthRoutes } from './Presentation/Routes/auth.routes';
 import { registerHealthRoutes } from './Presentation/Routes/health.routes';
 import { registerPlanRoutes } from './Presentation/Routes/plans.routes';
 import { registerQuotaRoutes } from './Presentation/Routes/quotas.routes';
@@ -68,6 +69,7 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
       registerHealthRoutes(api, container);
       registerAdminRoutes(api, container);
       registerAiRoutes(api, container);
+      registerAuthRoutes(api, container);
       // Account scope: every route below requires X-API-Key.
       await api.register(async (accountScope) => {
         accountScope.addHook('preHandler', requireApiKey((key) => container.accounts.authenticate.execute(key)));

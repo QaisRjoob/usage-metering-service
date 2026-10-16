@@ -15,7 +15,7 @@ export function RequireRole({ role, children }: { role: SessionRole; children: R
   const current = roleOf(session);
   if (!current) {
     const next = encodeURIComponent(`${location.pathname}${location.search}`);
-    return <Navigate to={`${routePaths.login}?role=${role}&next=${next}`} replace />;
+    return <Navigate to={`${routePaths.login}?next=${next}`} replace />;
   }
   if (current !== role) return <Navigate to={homeFor(current)} replace />;
   return <>{children}</>;

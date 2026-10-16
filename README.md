@@ -66,7 +66,9 @@ predefined plans and the demo data (all idempotent) → the web app starts once 
 | Operator admin token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`) | the **operator console** (`/admin`) |
 | Demo account API key | `umk_demo_local_only_do_not_use_in_production` | the **account portal** (`/app`) of "Demo Docs Inc" |
 
-The web app opens on a **login page** with two tabs, *Company account* and *Operator*. Each role
+The web app opens on a **login page with one field**: paste any token and press *Sign in*. The server
+identifies it (`POST /api/v1/auth/identify`): the operator token opens the operator console, an account
+API key opens that account's portal — nobody picks a role by hand. Each role
 gets its own interface (own layout, menu and URL space); the other role's pages are unreachable:
 
 | Interface | URL | Pages |
@@ -409,7 +411,7 @@ behind an ORM.
 allows indexed lookup). No JWT/end-user login (out of scope).
 
 **Frontend.** React + TanStack Query (server state, short `staleTime` for quotas, invalidation after
-every mutation), URL search params for filters/sort/pagination (one `useListQuery` hook validating with the shared query DTO), a login page with two role-guarded interfaces (`/admin`, `/app`), reusable filter bars (quick filters, "More filters" panel, removable chips, sortable column headers), lazy-loaded pages, a mock adapter that
+every mutation), URL search params for filters/sort/pagination (one `useListQuery` hook validating with the shared query DTO), a single-field login page (the server identifies the token) leading to two role-guarded interfaces (`/admin`, `/app`), reusable filter bars (quick filters, "More filters" panel, removable chips, sortable column headers), lazy-loaded pages, a mock adapter that
 follows the same business rules (Phase 1) and the HTTP adapter behind the same interfaces. The mock is
 never active in a production build unless explicitly configured.
 
