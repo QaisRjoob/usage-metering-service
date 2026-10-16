@@ -7,7 +7,21 @@ import { useServices } from '@/providers/ServicesProvider';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
 /** URL filter keys for the accounts list (validated by the shared listAccountsQuerySchema DTO). */
-export const ACCOUNT_FILTER_FIELDS = ['search', 'status', 'planId', 'planKind', 'minUtilization', 'maxUtilization', 'createdFrom', 'createdTo', 'month'] as const;
+export const ACCOUNT_FILTER_FIELDS = [
+  'search',
+  'status',
+  'activity',
+  'planId',
+  'planKind',
+  'hasRejections',
+  'minUsers',
+  'maxUsers',
+  'minUtilization',
+  'maxUtilization',
+  'createdFrom',
+  'createdTo',
+  'month',
+] as const;
 
 export function useAccountsViewModel() {
   const services = useServices();
@@ -17,6 +31,16 @@ export function useAccountsViewModel() {
   const accounts = useQuery({
     queryKey: queryKeys.admin.accounts(list.query ?? {}),
     queryFn: () => services.accounts.listAccounts(list.query!),
+    enabled: list.isValid,
+    staleTime: staleTimes.accounts,
+    placeholderData: keepPreviousData,
+  });
+
+  // Category counts follow the search text and month only, so each tab shows what clicking it gives.
+  const facetParams = { search: list.query?.search, month: list.query?.month };
+  const facets = useQuery({
+    queryKey: queryKeys.admin.accountFacets(facetParams),
+    queryFn: () => services.directory.accountFacets(facetParams),
     enabled: list.isValid,
     staleTime: staleTimes.accounts,
     placeholderData: keepPreviousData,
@@ -42,6 +66,7 @@ export function useAccountsViewModel() {
   return {
     list,
     accounts,
+    facets,
     planOptions: (plans.data?.items ?? []).map((plan) => ({
       value: plan.id,
       label: plan.isPredefined ? `${plan.name} (predefined)` : `${plan.name} — ${plan.ownerAccountName ?? 'custom'}`,

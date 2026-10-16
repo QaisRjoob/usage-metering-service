@@ -42,6 +42,14 @@ export interface UsageRecord {
   replayCount: number;
 }
 
+/** Request activity of an account or user: counts for the selected month, last request ever. */
+export interface ActivitySummary {
+  acceptedRequests: number;
+  rejectedRequests: number;
+  /** Timestamp of the most recent consume request (any month), or null if none. */
+  lastRequestAt: string | null;
+}
+
 export interface RequestCounts {
   accepted: number;
   rejected: number;

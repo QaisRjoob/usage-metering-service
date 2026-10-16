@@ -5,6 +5,7 @@ import { routePaths } from '@/routing/routePaths';
 import { isMockMode } from '@/services/api/apiConfig';
 import { credentials, roleOf } from '@/services/api/credentials';
 import { Badge } from '@/widgets/ui/Badge';
+import { OperatorFinder } from './OperatorFinder';
 import { Button } from '@/widgets/ui/Button';
 
 /** Shows who is signed in (operator, or which company) and the sign-out button. */
@@ -27,6 +28,11 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
         <Badge tone="warning" title="VITE_DATA_SOURCE=mock - data and quota logic come from the in-browser mock adapter">
           MOCK DATA
         </Badge>
+      )}
+      {role === 'operator' && (
+        <div className="hidden min-w-0 flex-1 sm:block">
+          <OperatorFinder />
+        </div>
       )}
       <div className="ml-auto flex min-w-0 items-center gap-3">
         {role === 'operator' && (

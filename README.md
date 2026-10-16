@@ -73,7 +73,7 @@ gets its own interface (own layout, menu and URL space); the other role's pages 
 
 | Interface | URL | Pages |
 |---|---|---|
-| Operator console | `/admin` | Overview (dashboard), Accounts, account details (read-only), Plan catalogue, Usage history across accounts, AI Advisor (all accounts) |
+| Operator console | `/admin` | Overview (dashboard), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
 | Account portal | `/app` | Overview, Users, Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
 
 Only one role is signed in at a time (signing in as one signs you out of the other), and the API
@@ -167,7 +167,7 @@ at `/api/v1/openapi.json` (Swagger UI: `/docs`). The contract types and request 
 | Area | Endpoints (prefix `/api/v1`) |
 |---|---|
 | Health | `GET /health`, `GET /ready` (checks PostgreSQL) |
-| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/analytics/summary` |
+| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/facets`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/users`, `GET /admin/users/facets`, `GET /admin/search`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/analytics/summary` |
 | Account | `GET /account`, `PUT /account/plan`, `GET /account/usage-summary?month=YYYY-MM` |
 | Users | `GET/POST /users`, `GET /users/:userId`, `PUT /users/:userId/plan`, `GET /users/:userId/usage-summary` |
 | Plans | `GET/POST /plans`, `GET/PATCH /plans/:planId` |
@@ -190,13 +190,19 @@ next to the field.
 
 | List | Filters | Sort keys |
 |---|---|---|
-| `GET /admin/accounts` | `search` (name/id), `status`, `planId`, `planKind` (predefined/custom), `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `name`, `createdAt`, `utilization`, `consumed`, `userCount` |
+| `GET /admin/accounts` | `search` (name, account id, API key prefix, or a user's id / display name), `status`, `activity` (active/inactive this month), `hasRejections`, `planId`, `planKind` (predefined/custom), `minUsers`/`maxUsers`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `name`, `createdAt`, `utilization`, `consumed`, `userCount`, `lastActivity`, `rejected` |
+| `GET /admin/users` (every company) | `search` (user id, display name, internal id), `accountId`, `planId`, `status`, `activity`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `externalUserId`, `accountName`, `createdAt`, `utilization`, `consumed`, `lastActivity` (default), `rejected` |
 | `GET /users`, `GET /admin/accounts/:id/users`, `GET /quotas` | `search`, `status`, `planId`, `minUtilization`/`maxUtilization`, `month` (not on quotas) | `externalUserId`, `createdAt`, `utilization`, `consumed` |
 | `GET /usage`, `GET /admin/usage` | `userId`, `outcome`, `rule`, `level`, `minUnits`/`maxUnits`, `requestId` (contains), `replayed`, `month`, `from`/`to`; admin adds `accountId` | `createdAt`, `units` |
 | `GET /plans`, `GET /admin/plans` | `search`, `scope`, `kind`; admin adds `ownerAccountId` | `name`, `createdAt`, `monthlyAllowance`, `maxUnitsPerRequest` |
 
 Example: the 20 largest rejections caused by a user limit this month, for one account:
 `GET /api/v1/admin/usage?accountId=…&level=user&month=2026-10&sort=units&order=desc&pageSize=20`.
+
+Category counts for the tabs come from `GET /admin/accounts/facets` and `GET /admin/users/facets`
+(per status, plan and activity, within the current search), and the operator header finder uses
+`GET /admin/search?q=` (up to 6 companies and 6 users, exact id / key-prefix matches first).
+Sorting by `lastActivity` puts rows without any request last in both directions.
 
 ### Main flow with curl
 

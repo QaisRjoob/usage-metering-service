@@ -9,6 +9,7 @@ export const routePaths = {
     root: '/admin',
     accounts: '/admin/accounts',
     accountDetails: '/admin/accounts/:accountId',
+    users: '/admin/users',
     plans: '/admin/plans',
     usage: '/admin/usage',
     advisor: '/admin/advisor',

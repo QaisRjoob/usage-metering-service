@@ -71,3 +71,17 @@ export function formatUtcDateTime(isoTimestamp: string): string {
   const timePart = parsed.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' });
   return `${datePart}, ${timePart} UTC`;
 }
+
+/** e.g. "just now", "12 min ago", "3 h ago", "5 d ago"; older than 30 days: "Sep 2, 2026". */
+export function formatRelativeTime(isoTimestamp: string, now: Date = new Date()): string {
+  const parsed = new Date(isoTimestamp);
+  if (Number.isNaN(parsed.getTime())) return 'Invalid date';
+  const minutes = Math.floor((now.getTime() - parsed.getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  if (days <= 30) return `${days} d ago`;
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}

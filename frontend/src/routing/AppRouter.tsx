@@ -14,6 +14,7 @@ import {
   NotFoundView,
   OperatorAiAdvisorView,
   OperatorPlansView,
+  OperatorUsersView,
   OperatorUsageHistoryView,
   PlansView,
   QuotasView,
@@ -40,6 +41,7 @@ export function AppRouter() {
         <Route path={op.root} element={<Lazy view={<DashboardView />} />} />
         <Route path={op.accounts} element={<Lazy view={<AccountsView />} />} />
         <Route path={op.accountDetails} element={<Lazy view={<AccountDetailsView />} />} />
+        <Route path={op.users} element={<Lazy view={<OperatorUsersView />} />} />
         <Route path={op.plans} element={<Lazy view={<OperatorPlansView />} />} />
         <Route path={op.usage} element={<Lazy view={<OperatorUsageHistoryView />} />} />
         <Route path={op.advisor} element={<Lazy view={<OperatorAiAdvisorView />} />} />

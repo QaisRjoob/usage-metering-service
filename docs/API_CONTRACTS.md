@@ -55,7 +55,14 @@ List endpoints take `page` (≥ 1, default 1) and `pageSize` (1–100, default 2
 { "items": [], "page": 1, "pageSize": 20, "totalItems": 0, "totalPages": 0, "hasNextPage": false, "hasPreviousPage": false }
 ```
 
-Ordering is stable with a unique tie-breaker (history: `created_at DESC, id DESC`).
+Ordering is stable with a unique tie-breaker (history: `created_at DESC, id DESC`). Sorting by
+`lastActivity` puts rows that never made a request last in both directions.
+
+Activity (`activity` on account rows and on directory users): `acceptedRequests` and
+`rejectedRequests` count consume requests of the selected month; `lastRequestAt` is the latest
+request ever (or `null`). "Active" means at least one request in the selected month. Facet counts
+follow only the search text (and company / month), not the category filters, so each tab shows how
+many rows clicking it would give.
 
 Each list's filters, sort keys and ranges are defined by its query DTO schema in
 `backend/src/contracts` (`list*QuerySchema`, `quotasQuerySchema`). Sort keys are a whitelist; `min*`/`max*`
@@ -105,9 +112,13 @@ cookie: the client then sends the token as `Authorization: Bearer` (operator) or
 | Method | Path | Request | Response |
 |---|---|---|---|
 | POST | `/admin/accounts` | `{ name, planId? }` (predefined account plan; default Starter) | `201 CreateAccountResponse { account, apiKey }` — the key is shown once |
-| GET | `/admin/accounts` | `page, pageSize, search?, status?, planId?, planKind?, minUtilization?, maxUtilization?, createdFrom?, createdTo?, month?, sort=name\|createdAt\|utilization\|consumed\|userCount, order=asc\|desc` | `Paginated<AccountListItem>` |
+| GET | `/admin/accounts` | `page, pageSize, search?` (name, account id, API key prefix, or a user's id / display name), `status?, activity?=active\|inactive, hasRejections?, planId?, planKind?, minUsers?, maxUsers?, minUtilization?, maxUtilization?, createdFrom?, createdTo?, month?, sort=name\|createdAt\|utilization\|consumed\|userCount\|lastActivity\|rejected, order=asc\|desc` | `Paginated<AccountListItem>` (each row has `activity { acceptedRequests, rejectedRequests, lastRequestAt }`) |
+| GET | `/admin/accounts/facets` | `search?, month?` | `AccountFacets { period, total, byStatus, byPlan[], byActivity { active, inactive } }` |
 | GET | `/admin/accounts/:accountId` | `month?` | `AccountDetails` |
 | GET | `/admin/accounts/:accountId/users` | same query as `GET /users` | `Paginated<UserWithQuota>` |
+| GET | `/admin/users` | `page, pageSize, search?` (user id, display name, internal id), `accountId?, planId?, status?, activity?, minUtilization?, maxUtilization?, createdFrom?, createdTo?, month?, sort=externalUserId\|accountName\|createdAt\|utilization\|consumed\|lastActivity\|rejected` (default `lastActivity desc`), `order` | `Paginated<AdminUserListItem>` (user + quota + `account { id, name }` + `activity`) |
+| GET | `/admin/users/facets` | `search?, accountId?, month?` | `UserFacets` (same shape as `AccountFacets`) |
+| GET | `/admin/search` | `q` (1–100 chars) | `AdminSearchResult { accounts[] (≤ 6), users[] (≤ 6) }`, exact id / key-prefix matches first |
 | GET | `/admin/plans` | `page, pageSize, search?, scope?, kind?, ownerAccountId?, sort?, order?` | `Paginated<AdminPlanListItem>` (plan + `ownerAccountName`, `assignedAccounts`, `assignedUsers`) |
 | GET | `/admin/usage` | same query as `GET /usage`, plus `accountId?` | `Paginated<UsageRecord>` |
 | GET | `/admin/analytics/summary` | `month` | `AdminAnalyticsSummary` |

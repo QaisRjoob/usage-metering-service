@@ -5,7 +5,7 @@ import type { AccountListItem } from '@/models/account';
 import { QUOTA_STATUSES, STATUS_LABELS, type QuotaStatus } from '@/models/quota';
 import { buildAccountDetailsPath } from '@/routing/routePaths';
 import { formatMonthLabel, formatUtcDateTime, recentMonths } from '@/utils/dateUtils';
-import { shortId } from '@/utils/formatUtils';
+import { planFacetLabel, shortId } from '@/utils/formatUtils';
 import { formatUnits } from '@/utils/numberUtils';
 import { useAccountsViewModel } from '@/view_models/useAccountsViewModel';
 import { DataTable, type Column } from '@/widgets/common/DataTable';
@@ -15,7 +15,9 @@ import { PageHeader } from '@/widgets/common/PageHeader';
 import { PaginationControls } from '@/widgets/common/PaginationControls';
 import { buildChips, countActive } from '@/widgets/filters/chips';
 import { FilterBar } from '@/widgets/filters/FilterBar';
-import { DateRangeFilter, RangeFilter, SegmentedFilter, SelectFilter } from '@/widgets/filters/FilterFields';
+import { CategoryGroup, CategoryPanel, CategoryTabs } from '@/widgets/filters/CategoryTabs';
+import { DateRangeFilter, RangeFilter, SelectFilter } from '@/widgets/filters/FilterFields';
+import { LastActivityCell, RequestCountsCell } from '@/widgets/directory/ActivityCells';
 import { AccountForm, IssuedApiKey } from '@/widgets/forms/AccountForm';
 import { QuotaProgressBar } from '@/widgets/quotas/QuotaProgressBar';
 import { QuotaStatusBadge } from '@/widgets/quotas/QuotaStatusBadge';
@@ -40,7 +42,17 @@ const columns: Column<AccountListItem>[] = [
       </div>
     ),
   },
-  { key: 'plan', header: 'Plan', cell: (row) => <span className="whitespace-nowrap">{row.quota.planName}</span>, hideBelow: 'sm' },
+  {
+    key: 'plan',
+    header: 'Plan',
+    cell: (row) => (
+      <div className="whitespace-nowrap">
+        <p>{row.quota.planName}</p>
+        <p className="text-[11px] text-slate-400">{formatUnits(row.quota.remaining)} left</p>
+      </div>
+    ),
+    hideBelow: 'sm',
+  },
   { key: 'users', header: 'Users', sortKey: 'userCount', cell: (row) => formatUnits(row.userCount), align: 'right', hideBelow: 'lg' },
   {
     key: 'usage',
@@ -60,10 +72,12 @@ const columns: Column<AccountListItem>[] = [
     cell: (row) => <QuotaProgressBar className="min-w-36" utilizationPercent={row.quota.utilizationPercent} status={row.quota.status} label={`${row.name} utilization`} />,
   },
   { key: 'status', header: 'Status', cell: (row) => <QuotaStatusBadge status={row.quota.status} /> },
+  { key: 'requests', header: 'Requests', sortKey: 'rejected', cell: (row) => <RequestCountsCell activity={row.activity} />, hideBelow: 'md' },
+  { key: 'lastActivity', header: 'Last request', sortKey: 'lastActivity', cell: (row) => <LastActivityCell lastRequestAt={row.activity.lastRequestAt} />, hideBelow: 'lg' },
   { key: 'created', header: 'Created (UTC)', sortKey: 'createdAt', cell: (row) => <span className="whitespace-nowrap text-xs">{formatUtcDateTime(row.createdAt)}</span>, hideBelow: 'lg' },
 ];
 
-const ADVANCED = ['planId', 'planKind', 'minUtilization', 'maxUtilization', 'createdFrom', 'createdTo', 'month'];
+const ADVANCED = ['planKind', 'hasRejections', 'minUsers', 'maxUsers', 'minUtilization', 'maxUtilization', 'createdFrom', 'createdTo', 'month'];
 
 export default function AccountsView() {
   const vm = useAccountsViewModel();
@@ -75,14 +89,18 @@ export default function AccountsView() {
     vm.dismissCreatedAccount();
   };
   const f = list.filters;
+  const facets = vm.facets.data;
 
   const chips = buildChips(
     f,
     [
       { key: 'search', label: 'Search' },
       { key: 'status', label: 'Status', format: (value) => STATUS_LABELS[value as QuotaStatus] ?? value },
+      { key: 'activity', label: 'Activity' },
       { key: 'planId', label: 'Plan', format: vm.planName },
       { key: 'planKind', label: 'Plan type' },
+      { key: 'hasRejections', label: 'Rejections', format: (value) => (value === 'true' ? 'some this month' : 'none this month') },
+      { range: ['minUsers', 'maxUsers'], label: 'Users' },
       { range: ['minUtilization', 'maxUtilization'], label: 'Utilization', unit: '%' },
       { key: 'createdFrom', label: 'Created from' },
       { key: 'createdTo', label: 'Created to' },
@@ -95,7 +113,7 @@ export default function AccountsView() {
     <>
       <PageHeader
         title="Accounts"
-        description="Every company using the service. Filter by status, plan, utilization or creation date; click a column title to sort. Quotas refer to the selected UTC month."
+        description="Every company using the service. Search by name, account id, API key prefix or one of its user ids; browse by category; click a column title to sort. Quotas and request counts refer to the selected UTC month."
         actions={
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="size-4" aria-hidden="true" /> Create account
@@ -103,20 +121,44 @@ export default function AccountsView() {
         }
       />
       <Card>
-        <FilterBar
-          search={{ value: f.search ?? '', onChange: (value) => list.set({ search: value }), placeholder: 'Search by name or account id', label: 'Search accounts' }}
-          quick={
-            <SegmentedFilter
+        <CategoryPanel>
+          <CategoryGroup title="Quota status">
+            <CategoryTabs
               label="Quota status"
-              value={(f.status as QuotaStatus | undefined) ?? ''}
+              value={f.status ?? ''}
               onChange={(value) => list.set({ status: value })}
-              options={[{ value: '', label: 'All' }, ...QUOTA_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] }))]}
+              options={[
+                { value: '', label: 'All', count: facets?.total },
+                ...QUOTA_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status], count: facets?.byStatus[status] })),
+              ]}
             />
-          }
+          </CategoryGroup>
+          <CategoryGroup title="Activity this month">
+            <CategoryTabs
+              label="Activity this month"
+              value={f.activity ?? ''}
+              onChange={(value) => list.set({ activity: value })}
+              options={[
+                { value: '', label: 'All', count: facets?.total },
+                { value: 'active', label: 'Active', count: facets?.byActivity.active },
+                { value: 'inactive', label: 'No requests', count: facets?.byActivity.inactive },
+              ]}
+            />
+          </CategoryGroup>
+          <CategoryGroup title="Plan">
+            <CategoryTabs
+              label="Plan"
+              value={f.planId ?? ''}
+              onChange={(value) => list.set({ planId: value })}
+              options={[{ value: '', label: 'All plans', count: facets?.total }, ...(facets?.byPlan ?? []).map((plan) => ({ value: plan.planId, label: planFacetLabel(plan), count: plan.count }))]}
+            />
+          </CategoryGroup>
+        </CategoryPanel>
+        <FilterBar
+          search={{ value: f.search ?? '', onChange: (value) => list.set({ search: value }), placeholder: 'Name, account id, key prefix or user id', label: 'Search accounts' }}
           advancedActiveCount={countActive(f, ADVANCED)}
           advanced={
             <>
-              <SelectFilter label="Plan" value={f.planId ?? ''} onChange={(value) => list.set({ planId: value })} options={vm.planOptions} allLabel="Any plan" error={list.errors.planId} />
               <SelectFilter
                 label="Plan type"
                 value={f.planKind ?? ''}
@@ -126,6 +168,23 @@ export default function AccountsView() {
                   { value: 'custom', label: 'Custom plan' },
                 ]}
                 allLabel="Any type"
+              />
+              <SelectFilter
+                label="Rejections this month"
+                value={f.hasRejections ?? ''}
+                onChange={(value) => list.set({ hasRejections: value })}
+                options={[
+                  { value: 'true', label: 'At least one rejection' },
+                  { value: 'false', label: 'No rejections' },
+                ]}
+                allLabel="Any"
+              />
+              <RangeFilter
+                label="Users"
+                min={f.minUsers ?? ''}
+                max={f.maxUsers ?? ''}
+                onChange={(min, max) => list.set({ minUsers: min, maxUsers: max })}
+                error={list.errors.minUsers ?? list.errors.maxUsers}
               />
               <RangeFilter
                 label="Utilization"

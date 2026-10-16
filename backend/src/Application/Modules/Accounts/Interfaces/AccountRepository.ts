@@ -1,4 +1,4 @@
-import type { AccountSortField, PlanKind, QuotaStatus, SortOrder } from '../../../../contracts';
+import type { AccountFacets, AccountSortField, ActivityFilter, AdminSearchResult, PlanKind, QuotaStatus, SortOrder } from '../../../../contracts';
 import type { Account, AuthenticatedAccount } from '../../../../Domain/Accounts/Account';
 import type { QuotaPeriod } from '../../../../Domain/Quotas/QuotaPeriod';
 import type { PageWindow } from '../../../Common/Pagination/pagination';
@@ -13,7 +13,17 @@ export interface AccountQuotaRow {
   plan: PlanVersionRow;
   consumed: number;
   userCount: number;
+  activity: ActivityRow;
 }
+
+/** Request counts of one month and the most recent request ever. */
+export interface ActivityRow {
+  acceptedRequests: number;
+  rejectedRequests: number;
+  lastRequestAt: Date | null;
+}
+
+export const NO_ACTIVITY: ActivityRow = { acceptedRequests: 0, rejectedRequests: 0, lastRequestAt: null };
 
 export interface AccountListFilter {
   period: QuotaPeriod;
@@ -26,6 +36,10 @@ export interface AccountListFilter {
   /** Inclusive UTC dates, YYYY-MM-DD. */
   createdFrom?: string;
   createdTo?: string;
+  activity?: ActivityFilter;
+  hasRejections?: boolean;
+  minUsers?: number;
+  maxUsers?: number;
   sort: AccountSortField;
   order: SortOrder;
 }
@@ -37,4 +51,8 @@ export interface AccountRepository {
   updatePlan(accountId: string, planId: string, updatedAt: Date): Promise<void>;
   getQuotaRow(accountId: string, period: QuotaPeriod): Promise<AccountQuotaRow | null>;
   list(filter: AccountListFilter, window: PageWindow): Promise<{ rows: AccountQuotaRow[]; total: number }>;
+  /** Category counts (status, plan, activity) within `search`. */
+  facets(filter: { period: QuotaPeriod; search?: string }): Promise<Omit<AccountFacets, 'period'>>;
+  /** Operator finder: accounts by name, id or API key prefix. */
+  quickSearch(query: string, limit: number): Promise<AdminSearchResult['accounts']>;
 }

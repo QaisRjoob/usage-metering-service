@@ -6,7 +6,7 @@ import { periodOf } from '../../../../Domain/Quotas/QuotaPeriod';
 import type { Clock } from '../../../Common/Clock';
 import type { PlanRepository } from '../../Plans/Interfaces/PlanRepository';
 import { toPlanVersionRow } from '../../Plans/DTOs/planMapping';
-import type { AccountRepository } from '../Interfaces/AccountRepository';
+import { NO_ACTIVITY, type AccountRepository } from '../Interfaces/AccountRepository';
 import { toAccountListItem } from '../DTOs/accountMapping';
 
 /**
@@ -31,7 +31,7 @@ export class CreateAccountCommand {
     const account = await this.accounts.create({ name: request.name, apiKeyHash: key.hash, apiKeyPrefix: key.prefix, planId: plan.id, createdAt: now });
     const period = periodOf(now);
     return {
-      account: toAccountListItem({ ...account, plan: toPlanVersionRow(plan), consumed: 0, userCount: 0 }, period),
+      account: toAccountListItem({ ...account, plan: toPlanVersionRow(plan), consumed: 0, userCount: 0, activity: NO_ACTIVITY }, period),
       apiKey: key.raw,
     };
   }

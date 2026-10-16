@@ -14,6 +14,7 @@ import {
   type AccountDetails,
   type AccountListItem,
   type AccountUsageSummary,
+  type ActivitySummary,
   type AdminAnalyticsSummary,
   type ConsumeDecision,
   type ConsumeRequest,
@@ -630,7 +631,23 @@ export class MockDatabase {
       createdAt: account.createdAt,
       quota: this.accountSnapshot(account, period),
       userCount: this.accountUsers(account.id).length,
+      activity: this.activity((row) => row.accountId === account.id, period),
     };
+  }
+
+  /** Request counts of the period and the latest request ever, for the rows matching `belongs`. */
+  activity(belongs: (row: RequestRow) => boolean, period: string): ActivitySummary {
+    let acceptedRequests = 0;
+    let rejectedRequests = 0;
+    let lastRequestAt: string | null = null;
+    for (const row of this.requests) {
+      if (!belongs(row)) continue;
+      if (lastRequestAt === null || row.createdAt > lastRequestAt) lastRequestAt = row.createdAt;
+      if (row.period !== period) continue;
+      if (row.outcome === 'accepted') acceptedRequests += 1;
+      else rejectedRequests += 1;
+    }
+    return { acceptedRequests, rejectedRequests, lastRequestAt };
   }
 
   accountDetails(account: AccountRow, period: string): AccountDetails {

@@ -43,9 +43,16 @@ export function toPlanVersionRow(row: PlanVersionColumns): PlanVersionRow {
   };
 }
 
+const escapeLike = (text: string) => text.replace(/[\\%_]/g, (char) => `\\${char}`);
+
 /** Escapes LIKE wildcards in user-supplied search text. */
 export function likePattern(search: string): string {
-  return `%${search.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+  return `%${escapeLike(search)}%`;
+}
+
+/** "starts with" pattern, used to rank finder results. */
+export function prefixPattern(search: string): string {
+  return `${escapeLike(search)}%`;
 }
 
 /** Collects positional parameters while building a WHERE clause. */

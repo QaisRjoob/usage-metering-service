@@ -19,6 +19,7 @@ describe('operator interface (/admin)', () => {
     ['/admin', 'Dashboard'],
     ['/admin/accounts', 'Accounts'],
     [`/admin/accounts/${DEMO_ACCOUNT_ID}`, 'Demo Docs Inc'],
+    ['/admin/users', 'Users directory'],
     ['/admin/plans', 'Plan catalogue'],
     ['/admin/usage', 'Usage history'],
     ['/admin/advisor', 'AI Usage Advisor'],
@@ -171,6 +172,46 @@ describe('server-side filters, sorting and pagination', () => {
       expect(within(row).getByText('Rejected')).toBeInTheDocument();
       expect(within(row).getByText('User (individual)')).toBeInTheDocument();
     }
+  });
+
+  it('finds a company by one of its users (display name) from the accounts search', async () => {
+    signInAsOperator();
+    renderWithProviders(<AppRouter />, { route: '/admin/accounts?search=Carol%20(Basic)' });
+    expect(await screen.findByText('1 result')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Demo Docs Inc' })).toBeInTheDocument();
+  });
+
+  it('browses accounts by category tabs that show server-side counts', async () => {
+    const user = userEvent.setup();
+    signInAsOperator();
+    renderWithProviders(<AppRouter />, { route: '/admin/accounts' });
+    const activity = await screen.findByRole('radiogroup', { name: 'Activity this month' });
+    const all = await within(activity).findByRole('radio', { name: 'All 13' });
+    expect(all).toHaveAttribute('aria-checked', 'true');
+    const custom = within(screen.getByRole('radiogroup', { name: 'Plan' })).getByRole('radio', { name: 'Demo Shared Pool (Demo Docs Inc) 1' });
+    await user.click(custom);
+    expect(await screen.findByText('1 result')).toBeInTheDocument();
+    expect(custom).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('lists users of every company and opens the company from a row', async () => {
+    const user = userEvent.setup();
+    signInAsOperator();
+    renderWithProviders(<AppRouter />, { route: '/admin/users?search=Bob%20(Premium)' });
+    expect(await screen.findByText('1 result', {}, { timeout: 15_000 })).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Demo Docs Inc' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Demo Docs Inc' })).toBeInTheDocument();
+  });
+
+  it('jumps to a company from the operator header finder', async () => {
+    const user = userEvent.setup();
+    signInAsOperator();
+    renderWithProviders(<AppRouter />, { route: '/admin' });
+    const finder = await screen.findByRole('combobox', { name: 'Find a company or user' });
+    await user.type(finder, 'Demo Docs');
+    await user.click(await screen.findByRole('option', { name: /Demo Docs Inc/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Demo Docs Inc' })).toBeInTheDocument();
   });
 
   it('shows the mock data badge in mock mode', async () => {

@@ -10,6 +10,7 @@ export const LoginView = lazy(() => import('@/views/LoginView'));
 export const DashboardView = lazy(() => import('@/views/DashboardView'));
 export const AccountsView = lazy(() => import('@/views/AccountsView'));
 export const AccountDetailsView = lazy(() => import('@/views/AccountDetailsView'));
+export const OperatorUsersView = lazy(() => import('@/views/OperatorUsersView'));
 export const OperatorPlansView = lazy(() => import('@/views/OperatorPlansView'));
 export const OperatorUsageHistoryView = lazy(() => import('@/views/UsageHistoryView').then((module) => ({ default: module.OperatorUsageHistoryView })));
 export const OperatorAiAdvisorView = lazy(() => import('@/views/AiAdvisorView').then((module) => ({ default: module.OperatorAiAdvisorView })));

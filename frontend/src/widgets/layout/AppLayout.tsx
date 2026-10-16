@@ -13,6 +13,7 @@ const operatorNav: NavSection[] = [
     items: [
       { to: routePaths.operator.root, label: 'Overview', icon: LayoutDashboard, end: true },
       { to: routePaths.operator.accounts, label: 'Accounts', icon: Building2 },
+      { to: routePaths.operator.users, label: 'Users directory', icon: Users },
       { to: routePaths.operator.plans, label: 'Plan catalogue', icon: Layers },
     ],
   },

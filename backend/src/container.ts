@@ -8,6 +8,7 @@ import { IdentifyCredentialQuery } from './Application/Modules/Accounts/Queries/
 import { GetAccountDetailsQuery } from './Application/Modules/Accounts/Queries/GetAccountDetailsQuery';
 import { GetCurrentAccountQuery } from './Application/Modules/Accounts/Queries/GetCurrentAccountQuery';
 import { ListAccountsQuery } from './Application/Modules/Accounts/Queries/ListAccountsQuery';
+import { AdminSearchQuery, GetAccountFacetsQuery, GetUserFacetsQuery, ListDirectoryUsersQuery } from './Application/Modules/Directory/Queries/DirectoryQueries';
 import { CreatePlanCommand } from './Application/Modules/Plans/Commands/CreatePlanCommand';
 import { UpdatePlanCommand } from './Application/Modules/Plans/Commands/UpdatePlanCommand';
 import { GetPlanQuery } from './Application/Modules/Plans/Queries/GetPlanQuery';
@@ -70,6 +71,7 @@ export function createContainer(options: ContainerOptions) {
       getCurrent: new GetCurrentAccountQuery(repos.accounts, repos.plans, clock),
       list: new ListAccountsQuery(repos.accounts, clock),
       getDetails: new GetAccountDetailsQuery(repos.accounts, repos.usage, clock),
+      facets: new GetAccountFacetsQuery(repos.accounts, clock),
       exists: async (accountId: string) => (await repos.accounts.findById(accountId)) !== null,
     },
     users: {
@@ -77,6 +79,11 @@ export function createContainer(options: ContainerOptions) {
       assignPlan: new AssignUserPlanCommand(transactions, clock),
       list: new ListUsersQuery(repos.users, clock),
       get: new GetUserQuery(repos.accounts, repos.users, repos.plans, clock),
+    },
+    directory: {
+      users: new ListDirectoryUsersQuery(repos.users, clock),
+      userFacets: new GetUserFacetsQuery(repos.users, clock),
+      search: new AdminSearchQuery(repos.accounts, repos.users),
     },
     plans: {
       create: new CreatePlanCommand(repos.plans, clock),

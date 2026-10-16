@@ -4,6 +4,7 @@ import type { AccountService } from '@/services/accountService';
 import type { CurrentAccountResponse } from '@/models/account';
 import type { MockDatabase, AccountRow } from './mockDatabase';
 import { PREDEFINED_PLAN_IDS } from './mockSeed';
+import { accountMatches, compareNullsLast } from './mockDirectory';
 import { filteredUsers, notFound, pageOf, requireAccount, requireAdmin, simulate, unprocessable, validate } from './mockRuntime';
 
 function currentAccount(db: MockDatabase, account: AccountRow): CurrentAccountResponse {
@@ -25,7 +26,7 @@ export function createMockAccountService(): AccountService {
         const search = query.search?.toLowerCase();
         const direction = query.order === 'asc' ? 1 : -1;
         const items = [...db.accounts.values()]
-          .filter((account) => !search || account.name.toLowerCase().includes(search) || account.id.includes(search))
+          .filter((account) => !search || accountMatches(db, account, search))
           .map((account) => db.accountListItem(account, period))
           .filter((account) => !query.status || account.quota.status === query.status)
           .filter((account) => !query.planId || account.quota.planId === query.planId)
@@ -34,7 +35,12 @@ export function createMockAccountService(): AccountService {
           .filter((account) => query.maxUtilization === undefined || account.quota.utilizationPercent <= query.maxUtilization)
           .filter((account) => !query.createdFrom || account.createdAt.slice(0, 10) >= query.createdFrom)
           .filter((account) => !query.createdTo || account.createdAt.slice(0, 10) <= query.createdTo)
+          .filter((account) => !query.activity || (query.activity === 'active') === account.activity.acceptedRequests + account.activity.rejectedRequests > 0)
+          .filter((account) => query.hasRejections === undefined || query.hasRejections === account.activity.rejectedRequests > 0)
+          .filter((account) => query.minUsers === undefined || account.userCount >= query.minUsers)
+          .filter((account) => query.maxUsers === undefined || account.userCount <= query.maxUsers)
           .sort((a, b) => {
+            if (query.sort === 'lastActivity') return compareNullsLast(a.activity.lastRequestAt, b.activity.lastRequestAt, direction) || a.id.localeCompare(b.id) * direction;
             const primary =
               query.sort === 'name'
                 ? a.name.localeCompare(b.name)
@@ -44,6 +50,8 @@ export function createMockAccountService(): AccountService {
                     ? a.quota.consumed - b.quota.consumed
                     : query.sort === 'userCount'
                       ? a.userCount - b.userCount
+                      : query.sort === 'rejected'
+                        ? a.activity.rejectedRequests - b.activity.rejectedRequests
                       : a.createdAt.localeCompare(b.createdAt);
             return (primary || a.id.localeCompare(b.id)) * direction;
           });

@@ -33,3 +33,8 @@ export function generateRequestId(prefix = 'req'): string {
 export function maskSecret(secret: string, visible = 10): string {
   return secret.length <= visible ? secret : `${secret.slice(0, visible)}…`;
 }
+
+/** Label of a plan category tab: custom plans show their owner. */
+export function planFacetLabel(plan: { planName: string; isPredefined: boolean; ownerAccountName: string | null }): string {
+  return plan.isPredefined || !plan.ownerAccountName ? plan.planName : `${plan.planName} (${plan.ownerAccountName})`;
+}

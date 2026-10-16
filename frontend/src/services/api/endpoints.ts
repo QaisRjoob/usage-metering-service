@@ -12,7 +12,11 @@ export const endpoints = {
   admin: {
     accounts: '/admin/accounts',
     account: (accountId: string) => `/admin/accounts/${segment(accountId)}`,
+    accountFacets: '/admin/accounts/facets',
     accountUsers: (accountId: string) => `/admin/accounts/${segment(accountId)}/users`,
+    users: '/admin/users',
+    userFacets: '/admin/users/facets',
+    search: '/admin/search',
     plans: '/admin/plans',
     usage: '/admin/usage',
     analyticsSummary: '/admin/analytics/summary',
