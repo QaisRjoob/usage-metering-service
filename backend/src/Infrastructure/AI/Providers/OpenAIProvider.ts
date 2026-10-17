@@ -52,9 +52,7 @@ export class OpenAIProvider implements AIProvider {
       });
       outputText = response.output_text;
     } catch (error) {
-      // Provider details (status, message) are not forwarded to clients.
-      const status = error instanceof OpenAI.APIError ? error.status : undefined;
-      throw new AppError('AI_PROVIDER_ERROR', status === 429 ? 'The AI provider is rate limiting requests. Try again later.' : 'The AI provider failed to answer. Try again later.');
+      throw new AppError('AI_PROVIDER_ERROR', providerErrorMessage(error));
     }
 
     try {
@@ -63,4 +61,20 @@ export class OpenAIProvider implements AIProvider {
       throw new AppError('AI_PROVIDER_ERROR', 'The AI provider returned an answer that is not valid JSON.');
     }
   }
+}
+
+/**
+ * A short, client-safe reason for a provider failure. Provider details (raw messages, request ids)
+ * are not forwarded; only the kind of problem, so the operator knows what to fix. OpenAI answers 429
+ * both for real rate limits and for an account without credit (code insufficient_quota).
+ */
+export function providerErrorMessage(error: unknown): string {
+  const status = error instanceof OpenAI.APIError ? error.status : undefined;
+  const code = error instanceof OpenAI.APIError ? (error.code ?? error.type ?? '') : '';
+  if (status === 429 && /insufficient_quota|credit/i.test(String(code))) {
+    return 'The AI provider account has no credit left. Add credit on the provider platform, or set AI_PROVIDER=mock.';
+  }
+  if (status === 429) return 'The AI provider is rate limiting requests. Try again later.';
+  if (status === 401) return 'The AI provider rejected the API key. Check OPENAI_API_KEY.';
+  return 'The AI provider failed to answer. Try again later.';
 }
