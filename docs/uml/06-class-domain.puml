@@ -1,0 +1,121 @@
+@startuml 06-class-domain
+title Class diagram - Domain model
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+hide empty methods
+
+enum PlanScope {
+  account
+  user
+}
+enum UsageOutcome {
+  accepted
+  rejected
+}
+enum RuleCode {
+  MAX_UNITS_PER_REQUEST
+  MONTHLY_ALLOWANCE
+}
+enum SignupStatus {
+  pending
+  approved
+  rejected
+}
+
+class Account {
+  id : uuid
+  name : string
+  apiKeyHash : sha256
+  apiKeyPrefix : string
+  createdAt : timestamp
+}
+class User {
+  id : uuid
+  externalUserId : string
+  displayName : string?
+  createdAt : timestamp
+}
+class Plan {
+  id : uuid
+  name : string
+  description : string?
+  scope : PlanScope
+  isPredefined : boolean
+}
+class PlanVersion {
+  id : uuid
+  version : int
+  monthlyAllowance : bigint
+  maxUnitsPerRequest : bigint
+  createdAt : timestamp
+}
+class AccountUsageCounter {
+  period : month (UTC)
+  consumed : bigint
+}
+class UserUsageCounter {
+  period : month (UTC)
+  consumed : bigint
+}
+class UsageRecord {
+  id : uuid
+  requestId : string
+  unitsRequested : bigint
+  outcome : UsageOutcome
+  rejectionRule : RuleCode?
+  rejectionLevel : PlanScope?
+  violations : RuleViolation[]
+  accountConsumedAfter : bigint
+  userConsumedAfter : bigint
+  period : month (UTC)
+  replayCount : int
+  createdAt : timestamp
+}
+class SignupRequest {
+  id : uuid
+  companyName : string
+  contactName : string
+  contactEmail : string
+  claimCodeHash : sha256
+  status : SignupStatus
+  decisionNote : string?
+  submittedAt, decidedAt, claimedAt
+}
+class RefreshToken {
+  id : uuid
+  familyId : uuid
+  tokenHash : sha256
+  role : operator | account
+  expiresAt, usedAt, revokedAt
+}
+
+class QuotaPolicy <<domain service>> {
+  + evaluateRequest(units, account, user) : UsageDecision
+  + computeQuotaNumbers(allowance, consumed)
+}
+
+Plan "1" *-- "1..*" PlanVersion : versions\n(immutable)
+Plan "1" --> "1" PlanVersion : current
+Account "0..1" -- "0..*" Plan : owns custom >
+Account "*" --> "1" Plan : account plan\n(scope = account)
+User "*" --> "1" Plan : user plan\n(scope = user)
+Account "1" *-- "0..*" User
+Account "1" *-- "0..*" AccountUsageCounter : per month
+User "1" *-- "0..*" UserUsageCounter : per month
+User "1" -- "0..*" UsageRecord
+UsageRecord "*" --> "1" PlanVersion : account version
+UsageRecord "*" --> "1" PlanVersion : user version
+SignupRequest "*" --> "1" Plan : requested
+SignupRequest "0..1" --> "0..1" Account : creates
+RefreshToken "*" --> "0..1" Account : session of
+
+QuotaPolicy ..> PlanVersion : reads limits
+QuotaPolicy ..> AccountUsageCounter
+QuotaPolicy ..> UserUsageCounter
+
+note bottom of UsageRecord
+  Unique (account, requestId):
+  the decision is also the
+  idempotency record.
+end note
+@enduml

@@ -1,0 +1,50 @@
+@startuml 02-sequence-consume
+title Sequence - POST /usage/consume (one transaction)
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+autonumber
+
+participant "Client application" as Client
+participant "Fastify route\n(requireAccount)" as Route
+participant "ConsumeUnitsCommand" as Cmd
+participant "TransactionManager" as Tx
+database "PostgreSQL" as DB
+participant "QuotaPolicy\n(evaluateRequest)" as Policy
+
+Client -> Route : POST /usage/consume\nX-API-Key or Bearer JWT\n{ userId, units, requestId }
+Route -> Route : authenticate (key hash / JWT)\n-> accountId
+Route -> Route : validate body (zod)
+Route -> Cmd : execute(request, { accountId })
+Cmd -> Tx : run(work)
+Tx -> DB : BEGIN
+
+Cmd -> DB : pg_advisory_xact_lock(account, requestId)
+note right: concurrent retries of the\nsame request wait here
+Cmd -> DB : find record by (account, requestId)
+
+alt request already processed
+  alt same userId + units
+    Cmd -> DB : replay_count + 1
+    Cmd --> Route : stored decision\n(idempotentReplay: true)
+  else different payload
+    Cmd --> Route : 409 IDEMPOTENCY_KEY_REUSED
+  end
+else new request
+  Cmd -> DB : find user (account, externalUserId)
+  Cmd -> DB : SELECT account counter FOR UPDATE
+  Cmd -> DB : SELECT user counter FOR UPDATE
+  note right: fixed lock order:\naccount, then user\n(no deadlocks)
+  Cmd -> DB : current plan versions\n(read after the locks)
+  Cmd -> Policy : evaluate(units, account, user)
+  Policy --> Cmd : accepted | rejection(rule, level)\n+ all violations
+  opt accepted
+    Cmd -> DB : add units to both counters
+  end
+  Cmd -> DB : INSERT usage record\n(decision + plan versions)
+  Cmd --> Route : ConsumeDecision
+end
+
+Tx -> DB : COMMIT
+note over Tx, DB : deadlock / serialization failure\n-> roll back and retry (bounded)
+Route --> Client : 200 { accepted, rejection, violations,\naccount & user snapshots }
+@enduml

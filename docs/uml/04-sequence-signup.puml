@@ -1,0 +1,50 @@
+@startuml 04-sequence-signup
+title Sequence - Self-service sign-up, operator approval, key claim
+skinparam shadowing false
+autonumber
+
+actor Applicant
+actor Operator
+participant "Web app" as Web
+participant "API" as API
+database "PostgreSQL" as DB
+
+Applicant -> Web : fill /signup form\n(company, contact, email, plan)
+Web -> API : POST /signup-requests
+API -> DB : INSERT signup_requests\n(status pending, claim code hash)
+API --> Web : 201 { requestId, claimCode (shown once) }
+Web --> Applicant : show request id + claim code
+
+Applicant -> Web : /signup/status (id + code)
+Web -> API : POST /signup-requests/status
+API -> DB : find by id, compare code hash\n(constant time)
+API --> Web : status: pending
+
+Operator -> Web : Access requests page
+Web -> API : GET /admin/signup-requests (operator JWT)
+API --> Web : list + counts per status
+
+alt approve
+  Operator -> Web : Approve (plan, message)
+  Web -> API : POST /admin/signup-requests/{id}/approve
+  API -> DB : BEGIN; lock request\nINSERT account (placeholder key hash)\nmark approved; COMMIT
+  API --> Web : approved
+  Applicant -> Web : check status, "Get my API key"
+  Web -> API : POST /signup-requests/claim (id + code)
+  API -> DB : BEGIN; lock request\nreplace key hash, mark claimed; COMMIT
+  API --> Web : { account, apiKey (once) }
+  Web -> API : POST /auth/token (the new key)
+  API --> Web : account JWT -> account portal
+else deny
+  Operator -> Web : Deny (reason required)
+  Web -> API : POST /admin/signup-requests/{id}/reject
+  API -> DB : mark rejected (note)
+  Applicant -> Web : check status
+  API --> Web : rejected + operator's reason
+end
+
+note over API, DB
+  Wrong claim code and unknown id answer the same 404.
+  One open request per email; one account per request.
+end note
+@enduml

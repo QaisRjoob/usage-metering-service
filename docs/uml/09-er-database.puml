@@ -1,0 +1,121 @@
+@startuml 09-er-database
+title ER diagram - PostgreSQL schema (migrations 001-005)
+skinparam shadowing false
+skinparam linetype ortho
+hide circle
+
+entity plans {
+  * id : uuid <<PK>>
+  --
+  * name : text
+  description : text
+  * scope : text (account|user)
+  * is_predefined : boolean
+  owner_account_id : uuid <<FK accounts>>
+  * current_version_id : uuid <<FK plan_versions (id, plan_id)>>
+  created_at, updated_at
+}
+
+entity plan_versions {
+  * id : uuid <<PK>>
+  --
+  * plan_id : uuid <<FK plans>>
+  * version : int
+  * monthly_allowance : bigint
+  * max_units_per_request : bigint
+  created_at
+  ..
+  UNIQUE (plan_id, version)
+}
+
+entity accounts {
+  * id : uuid <<PK>>
+  --
+  * name : text
+  * api_key_hash : text <<UNIQUE, sha256>>
+  * api_key_prefix : text
+  * plan_id, plan_scope='account' <<FK plans (id, scope)>>
+  created_at, updated_at
+}
+
+entity users {
+  * id : uuid <<PK>>
+  --
+  * account_id : uuid <<FK accounts>>
+  * external_user_id : text
+  display_name : text
+  * plan_id, plan_scope='user' <<FK plans (id, scope)>>
+  created_at, updated_at
+  ..
+  UNIQUE (account_id, external_user_id)
+}
+
+entity account_usage_counters {
+  * account_id : uuid <<PK, FK>>
+  * period : date <<PK>>
+  --
+  * consumed : bigint >= 0
+}
+
+entity user_usage_counters {
+  * user_id : uuid <<PK, FK>>
+  * period : date <<PK>>
+  --
+  * consumed : bigint >= 0
+}
+
+entity usage_records {
+  * id : uuid <<PK>>
+  --
+  * user_id, account_id <<FK users (id, account_id)>>
+  * request_id : text
+  * units_requested : bigint
+  * outcome : text
+  rejection_rule, rejection_level : text
+  * violations : jsonb
+  * account_plan_version_id <<FK plan_versions>>
+  * user_plan_version_id <<FK plan_versions>>
+  * account_consumed_after, user_consumed_after
+  * period : date (= UTC month of created_at)
+  * created_at, replay_count
+  ..
+  UNIQUE (account_id, request_id)
+}
+
+entity signup_requests {
+  * id : uuid <<PK>>
+  --
+  * company_name, contact_name, contact_email
+  * requested_plan_id, scope='account' <<FK plans>>
+  * claim_code_hash : text
+  * status : pending|approved|rejected
+  decision_note : text
+  account_id : uuid <<UNIQUE, FK accounts>>
+  submitted_at, decided_at, claimed_at
+}
+
+entity refresh_tokens {
+  * id : uuid <<PK>>
+  --
+  * family_id : uuid
+  * token_hash : text <<UNIQUE>>
+  * role : operator|account
+  account_id : uuid <<FK accounts>>
+  * created_at, expires_at
+  used_at, revoked_at
+}
+
+plans ||--|{ plan_versions
+plans ||--|| plan_versions : current
+accounts |o--o{ plans : owns
+plans ||--o{ accounts : account plan
+plans ||--o{ users : user plan
+accounts ||--o{ users
+accounts ||--o{ account_usage_counters
+users ||--o{ user_usage_counters
+users ||--o{ usage_records
+plan_versions ||--o{ usage_records
+plans ||--o{ signup_requests
+signup_requests |o--o| accounts
+accounts |o--o{ refresh_tokens
+@enduml

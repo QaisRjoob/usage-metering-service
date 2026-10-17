@@ -1,0 +1,15 @@
+@startuml 11-state-signup-request
+title State - Sign-up request
+skinparam shadowing false
+
+[*] --> Pending : applicant submits\n(request id + claim code issued)
+Pending --> Approved : operator approves\n/ account created
+Pending --> Rejected : operator denies\n/ reason recorded
+Approved --> Claimed : applicant collects the API key\n(exactly once)
+Claimed --> [*]
+Rejected --> [*] : applicant may submit\na new request
+
+Pending : one open request per email
+Approved : key not collected yet
+Claimed : the account's real API key issued,\nonly its hash stored
+@enduml

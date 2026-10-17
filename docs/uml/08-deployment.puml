@@ -1,0 +1,39 @@
+@startuml 08-deployment
+title Deployment diagram - docker compose up --build
+skinparam shadowing false
+
+node "Developer computer" {
+  node "Browser" as Browser {
+    artifact "React app\n(access token in memory,\nrefresh token in HttpOnly cookie)" as App
+  }
+  artifact "CLI client\n(npm run demo:cli, X-API-Key)" as CLI
+
+  node "Docker (network metering 172.30.0.0/24)" as Docker {
+    node "web\nnginx 1.27\n172.30.0.10" as Web {
+      artifact "static build\n+ /api/* proxy\n+ CSP & security headers" as WebArt
+    }
+    node "api\nNode 22, Fastify" as Api {
+      artifact "dist/server.js\nmigrations + seed at start" as ApiArt
+    }
+    node "postgres\nPostgreSQL 17" as Pg {
+      database "metering" as Db
+    }
+    storage "volume pgdata" as Vol
+  }
+}
+
+cloud "OpenAI / OpenRouter\n(optional, AI_PROVIDER=openai)" as LLM
+
+Browser --> Web : http://localhost:8080\n(127.0.0.1 / ::1 only)
+Web --> Api : /api/* -> http://api:3000\nX-Forwarded-For (trusted from web only)
+CLI --> Api : http://localhost:3000/api/v1
+Api --> Pg : postgres://...:5432\npool (DATABASE_POOL_MAX)
+Pg --> Vol : data survives restarts
+Api ..> LLM : HTTPS (only when enabled)
+
+note bottom of Docker
+  restart: unless-stopped on every service
+  postgres healthy (pg_isready over TCP) -> api healthy (/ready) -> web
+  ports published on loopback only: 8080 (web), 3000 (API, Swagger), 5433 (psql)
+end note
+@enduml

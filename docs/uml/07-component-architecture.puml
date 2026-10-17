@@ -1,0 +1,74 @@
+@startuml 07-component-architecture
+title Component diagram - Layered architecture (modular monolith)
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "frontend (React 19, Vite)" as FE {
+  [Views\n(operator console /admin,\naccount portal /app, public pages)] as Views
+  [View models & hooks\n(useListQuery, TanStack Query)] as VM
+  [Services\n(HTTP + mock adapters)] as Services
+  [apiClient\n(Bearer JWT, silent refresh)] as ApiClient
+  [Shared contracts\n(zod DTOs, types)] as FEContracts
+}
+
+package "backend (Fastify, TypeScript)" as BE {
+  package "Presentation" {
+    [Routes\n(auth, admin, account, users,\nplans, quotas, usage, signup, ai)] as Routes
+    [Guards\n(requireOperator, requireAccount)\nrate limits, error handler] as Guards
+    [OpenAPI / Swagger UI] as OpenAPI
+  }
+  package "Application" {
+    [Commands\n(Consume, CreateAccount, AssignPlan,\nApproveSignup, IssueToken, ...)] as Commands
+    [Queries\n(ListAccounts, Directory, CompanyStats,\nUsageSummary, AskAdvisor, ...)] as Queries
+    [Ports\n(repositories, TransactionManager,\nAccessTokenService, AIProvider)] as Ports
+  }
+  package "Domain" {
+    [QuotaPolicy\n(two-level evaluation)] as Policy
+    [Entities & errors\n(Plan, ApiKey, SignupRequest,\nAuthTokens)] as Entities
+  }
+  package "Infrastructure" {
+    [Postgres repositories\n(explicit SQL)] as Repos
+    [Transaction manager\n(retry on deadlock)] as TxM
+    [JoseAccessTokenService\n(JWT HS256)] as Jose
+    [AI providers\n(mock, OpenAI SDK)] as AIImpl
+    [Migrations & seed] as Migr
+  }
+  [Shared contracts\n(same files)] as BEContracts
+  [container.ts\n(composition root)] as Container
+}
+
+database "PostgreSQL 17" as PG
+cloud "OpenAI / OpenRouter" as LLM
+
+Views --> VM
+VM --> Services
+Services --> ApiClient
+Services ..> FEContracts
+ApiClient --> Routes : HTTPS JSON\n(/api/v1 via nginx)
+
+Routes --> Guards
+Routes --> Commands
+Routes --> Queries
+Routes ..> BEContracts
+Commands --> Ports
+Queries --> Ports
+Commands --> Policy
+Commands --> Entities
+Repos ..|> Ports
+TxM ..|> Ports
+Jose ..|> Ports
+AIImpl ..|> Ports
+Repos --> PG
+TxM --> PG
+Migr --> PG
+AIImpl --> LLM
+Container ..> Repos
+Container ..> Commands
+Container ..> Queries
+
+note right of BEContracts
+  backend/src/contracts is copied unchanged
+  to frontend/src/contracts: both sides validate
+  with the same zod schemas.
+end note
+@enduml

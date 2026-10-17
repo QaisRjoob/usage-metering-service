@@ -1,0 +1,44 @@
+@startuml 10-activity-quota-decision
+title Activity - Quota decision for one consume request
+skinparam shadowing false
+
+start
+:Receive { userId, units, requestId }\nfor the authenticated account;
+if (units is a positive whole number\n<= 1,000,000?) then (no)
+  :400 VALIDATION_ERROR;
+  stop
+endif
+if (requestId already used\nby this account?) then (yes)
+  if (same userId and units?) then (yes)
+    :Return the stored decision\n(idempotentReplay = true,\nnothing consumed again);
+  else (no)
+    :409 IDEMPOTENCY_KEY_REUSED;
+  endif
+  stop
+endif
+if (user registered in this account?) then (no)
+  :404 USER_NOT_FOUND;
+  stop
+endif
+:Lock account counter, then user counter\n(current UTC month);
+:Read current account and user plan versions;
+partition "evaluateRequest (rule order)" {
+  :1. user MAX_UNITS_PER_REQUEST;
+  :2. account MAX_UNITS_PER_REQUEST;
+  :3. user MONTHLY_ALLOWANCE\n(consumed + units <= allowance);
+  :4. account MONTHLY_ALLOWANCE;
+  note right
+    Every rule is checked; all failures
+    go to "violations", the first one
+    is the reported "rejection".
+  end note
+}
+if (any rule failed?) then (yes)
+  :Rejected: counters unchanged\n(no partial consumption);
+else (no)
+  :Accepted: add units to the user counter\nAND the account counter;
+endif
+:Store the decision with both plan versions\nand the counters after it;
+:Return decision + both quota snapshots\n(remaining = max(0, allowance - consumed));
+stop
+@enduml

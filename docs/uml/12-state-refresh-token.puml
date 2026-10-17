@@ -1,0 +1,16 @@
+@startuml 12-state-refresh-token
+title State - Refresh token (one link of a session family)
+skinparam shadowing false
+
+[*] --> Active : issued at sign-in\nor by a refresh
+Active --> Used : POST /auth/refresh\n/ next token issued (same family)
+Active --> Expired : REFRESH_TOKEN_TTL_DAYS passed
+Active --> Revoked : sign-out, or reuse\ndetected in the family
+Used --> Revoked : presented again (replay)\n/ whole family revoked
+Expired --> [*]
+Revoked --> [*]
+Used --> [*]
+
+Active : stored only as a SHA-256 hash
+Used : must never be presented again
+@enduml

@@ -1,0 +1,81 @@
+@startuml 01-use-cases
+title Usage Metering & Quota Service - Use cases
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #EEF2FF
+  BorderColor #4F46E5
+}
+skinparam actorStyle awesome
+
+' Left side: the company and the people who want to become one
+actor "Applicant\n(new company)" as Applicant
+actor "Company owner\n(account portal)" as Owner
+
+rectangle "Usage Metering & Quota Service" {
+  package "Access" {
+    usecase "Request an account" as UC_Signup
+    usecase "Follow request status" as UC_Status
+    usecase "Collect the API key (once)" as UC_Claim
+    usecase "Sign in (credential -> JWT)\nrefresh / sign out" as UC_SignIn
+  }
+
+  package "Company self-service" {
+    usecase "Register users" as UC_Users
+    usecase "Create / edit custom plans" as UC_Plans
+    usecase "Assign or switch plans" as UC_Assign
+    usecase "View quotas, history,\nuser statistics" as UC_View
+    usecase "Run the Client Demo" as UC_Demo
+  }
+
+  package "Metering (core)" {
+    usecase "Consume units" as UC_Consume
+    usecase "Retry safely\n(idempotent requestId)" as UC_Retry
+    usecase "Dry-run quota check" as UC_Check
+  }
+
+  package "Operation" {
+    usecase "Approve / deny\naccess requests" as UC_Review
+    usecase "Create accounts\n(issue API key)" as UC_CreateAcc
+    usecase "Browse companies & users\n(search, categories, filters)" as UC_Browse
+    usecase "Company statistics &\ncross-account history" as UC_Stats
+  }
+
+  usecase "Ask the AI Usage Advisor" as UC_AI
+}
+
+' Right side: the operator, machine clients and the external AI
+actor "Operator\n(operator console)" as Operator
+actor "Client application\n(server-to-server, X-API-Key)" as Client
+actor "AI provider\n(OpenAI / OpenRouter)" as AI <<external>>
+
+Applicant --> UC_Signup
+Applicant --> UC_Status
+Applicant --> UC_Claim
+
+Owner --> UC_SignIn
+Owner --> UC_Users
+Owner --> UC_Plans
+Owner --> UC_Assign
+Owner --> UC_View
+Owner --> UC_Demo
+Owner --> UC_AI
+
+UC_Claim ..> UC_SignIn : <<precedes>>
+UC_Demo ..> UC_Consume : <<include>>
+UC_Retry ..> UC_Consume : <<extend>>
+UC_Review ..> UC_CreateAcc : <<include>>
+
+UC_Consume <-- Client
+UC_Check <-- Client
+UC_SignIn <-- Operator
+UC_Review <-- Operator
+UC_Browse <-- Operator
+UC_Stats <-- Operator
+UC_AI <-- Operator
+UC_AI --> AI
+
+note "Accepted only if BOTH the user plan and\nthe shared account plan allow the full amount.\nA rejection consumes nothing." as N1
+UC_Consume .. N1
+@enduml

@@ -38,6 +38,7 @@ It ships with an operator dashboard and an example client (the **Client Demo** p
 15. [AI Usage Advisor](#15-ai-usage-advisor)
 16. [Local development without Docker](#16-local-development-without-docker)
 17. [Known limitations](#17-known-limitations)
+18. [UML diagrams](#18-uml-diagrams)
 
 ---
 
@@ -580,6 +581,35 @@ npm run dev:api-mode          # http://localhost:5174 against the real API on :3
   pagination would avoid it).
 - The AI advisor was verified live through OpenRouter (free model), not against OpenAI itself (that key had no credit); free models are slower (15–25 s) and rate-limited by OpenRouter.
 - `npm audit` reports advisories only in dev tooling (vitest's `tinypool`); not part of any image.
+
+## 18. UML diagrams
+
+The diagrams are written in [PlantUML](https://plantuml.com/) and live in [docs/uml](docs/uml).
+Rendered SVG and PNG files are committed next to the sources.
+
+| Type | Diagram | Shows |
+| --- | --- | --- |
+| Use cases | [01-use-cases](docs/uml/svg/01-use-cases.svg) ([PNG](docs/uml/png/01-use-cases.png), [source](docs/uml/01-use-cases.puml)) | Actors (applicant, company owner, client application, operator, AI provider) and what each can do |
+| Sequence | [02-sequence-consume](docs/uml/svg/02-sequence-consume.svg) ([PNG](docs/uml/png/02-sequence-consume.png), [source](docs/uml/02-sequence-consume.puml)) | `POST /usage/consume`: one transaction, advisory lock, idempotency, row locks, evaluation |
+| Sequence | [03-sequence-jwt-auth](docs/uml/svg/03-sequence-jwt-auth.svg) ([PNG](docs/uml/png/03-sequence-jwt-auth.png), [source](docs/uml/03-sequence-jwt-auth.puml)) | Sign-in, authenticated request, silent refresh, reuse detection, reload, sign-out |
+| Sequence | [04-sequence-signup](docs/uml/svg/04-sequence-signup.svg) ([PNG](docs/uml/png/04-sequence-signup.png), [source](docs/uml/04-sequence-signup.puml)) | Sign-up request, operator approval or denial, one-time API key collection |
+| Sequence | [05-sequence-ai-advisor](docs/uml/svg/05-sequence-ai-advisor.svg) ([PNG](docs/uml/png/05-sequence-ai-advisor.png), [source](docs/uml/05-sequence-ai-advisor.puml)) | AI Usage Advisor: context building and the mock or OpenAI-compatible provider |
+| Class | [06-class-domain](docs/uml/svg/06-class-domain.svg) ([PNG](docs/uml/png/06-class-domain.png), [source](docs/uml/06-class-domain.puml)) | Domain model: accounts, users, plans and versions, counters, usage records, tokens |
+| Component | [07-component-architecture](docs/uml/svg/07-component-architecture.svg) ([PNG](docs/uml/png/07-component-architecture.png), [source](docs/uml/07-component-architecture.puml)) | Frontend and backend layers (Presentation, Application, Domain, Infrastructure) |
+| Deployment | [08-deployment](docs/uml/svg/08-deployment.svg) ([PNG](docs/uml/png/08-deployment.png), [source](docs/uml/08-deployment.puml)) | Docker Compose: nginx, API, PostgreSQL, network, volume, loopback ports |
+| ER | [09-er-database](docs/uml/svg/09-er-database.svg) ([PNG](docs/uml/png/09-er-database.png), [source](docs/uml/09-er-database.puml)) | PostgreSQL schema from migrations 001-005 with keys and constraints |
+| Activity | [10-activity-quota-decision](docs/uml/svg/10-activity-quota-decision.svg) ([PNG](docs/uml/png/10-activity-quota-decision.png), [source](docs/uml/10-activity-quota-decision.puml)) | How one consume request is accepted or rejected (rule order) |
+| State | [11-state-signup-request](docs/uml/svg/11-state-signup-request.svg) ([PNG](docs/uml/png/11-state-signup-request.png), [source](docs/uml/11-state-signup-request.puml)) | Life cycle of a sign-up request |
+| State | [12-state-refresh-token](docs/uml/svg/12-state-refresh-token.svg) ([PNG](docs/uml/png/12-state-refresh-token.png), [source](docs/uml/12-state-refresh-token.puml)) | Life cycle of a refresh token in a session family |
+
+![Use cases](docs/uml/svg/01-use-cases.svg)
+
+After editing a `.puml` file, render all diagrams again with the public PlantUML server
+(set `PLANTUML_SERVER` to use your own server):
+
+```bash
+node docs/uml/render.mjs
+```
 
 ---
 

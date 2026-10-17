@@ -1,0 +1,54 @@
+@startuml 03-sequence-jwt-auth
+title Sequence - JWT sign-in, silent refresh, reuse detection, sign-out
+skinparam shadowing false
+autonumber
+
+actor User
+participant "Web app\n(React, apiClient)" as Web
+participant "nginx\n(/api proxy)" as Nginx
+participant "API\n/auth routes" as Auth
+participant "AccessTokenService\n(jose, HS256)" as JWT
+database "PostgreSQL\nrefresh_tokens" as DB
+
+== Sign in ==
+User -> Web : paste API key or operator token
+Web -> Nginx : POST /api/v1/auth/token { token }
+Nginx -> Auth : forward
+Auth -> Auth : identify credential\n(operator token | API key hash)
+Auth -> JWT : issue(role, subject)
+JWT --> Auth : access token (15 min)
+Auth -> DB : INSERT refresh token hash\n(new family)
+Auth --> Web : { accessToken, role, account }\nSet-Cookie: umk_refresh\n(HttpOnly, SameSite=Strict)
+Web -> Web : keep access token in memory only
+
+== Normal request ==
+Web -> Auth : GET /admin/accounts\nAuthorization: Bearer <JWT>
+Auth -> JWT : verify (alg, iss, aud, exp)
+Auth --> Web : 200 data
+
+== Token about to expire / expired ==
+alt < 30 s left (before the request)
+  Web -> Auth : POST /auth/refresh (cookie + X-Requested-With)
+else server answers 401 TOKEN_EXPIRED
+  Web -> Auth : POST /auth/refresh, then retry once
+end
+Auth -> DB : find token by hash FOR UPDATE
+alt valid and unused
+  Auth -> DB : mark used, INSERT next token\n(same family)
+  Auth --> Web : new access token + new cookie
+else already used (copied token replayed)
+  Auth -> DB : revoke the whole family
+  Auth --> Web : 401 REFRESH_TOKEN_INVALID
+  Web -> Web : end session -> login page
+end
+
+== Page reload ==
+Web -> Auth : POST /auth/refresh (cookie)
+Auth --> Web : new access token (session restored)
+
+== Sign out ==
+User -> Web : Sign out
+Web -> Auth : POST /auth/logout (cookie + X-Requested-With)
+Auth -> DB : revoke family
+Auth --> Web : 204, cookie cleared
+@enduml
