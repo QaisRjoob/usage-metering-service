@@ -16,7 +16,7 @@ const envSchema = z
     ADMIN_API_TOKEN: z.string().min(16, 'ADMIN_API_TOKEN must be at least 16 characters'),
     CORS_ORIGINS: z
       .string()
-      .default('http://localhost:5173,http://localhost:8080')
+      .default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080')
       .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean)),
     RUN_MIGRATIONS: booleanFlag.default(true),
     SEED_DEMO_DATA: booleanFlag.default(true),

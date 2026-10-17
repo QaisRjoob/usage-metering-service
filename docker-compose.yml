@@ -2,7 +2,8 @@
 #   docker compose up --build
 # Web:  http://localhost:8080      API: http://localhost:3000/api/v1      Docs: http://localhost:3000/docs
 # Runs without an OpenAI key (AI_PROVIDER defaults to mock).
-# Ports are published on 127.0.0.1 only: the stack is reachable from this computer, not the network.
+# Ports are published on the loopback addresses only (IPv4 127.0.0.1 and IPv6 ::1, so "localhost"
+# works whichever one the browser picks): the stack is reachable from this computer, not the network.
 name: usage-metering
 
 services:
@@ -17,6 +18,7 @@ services:
     ports:
       # Published on 5433 for local inspection (psql) without clashing with a native PostgreSQL.
       - "127.0.0.1:5433:5432"
+      - "[::1]:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U metering -d metering"]
       interval: 3s
@@ -36,7 +38,8 @@ services:
       DATABASE_POOL_MAX: "20"
       # Local/demo operator token. Override in a .env file next to this compose file.
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-local-admin-token-change-me}
-      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      # The web app may be opened as localhost or 127.0.0.1; both are allowed.
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RUN_MIGRATIONS: "true"
       SEED_DEMO_DATA: "true"
@@ -48,6 +51,7 @@ services:
       TRUST_PROXY_HOPS: "0"
     ports:
       - "127.0.0.1:3000:3000"
+      - "[::1]:3000:3000"
 
   web:
     build:
@@ -62,6 +66,7 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8080:80"
+      - "[::1]:8080:80"
 
 volumes:
   pgdata:
