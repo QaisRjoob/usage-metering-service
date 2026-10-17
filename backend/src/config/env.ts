@@ -33,6 +33,13 @@ const envSchema = z
     /** POST /auth/identify (login) attempts per minute per client IP. */
     LOGIN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(20),
     SIGNUP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(10),
+    /** Wrong credentials (admin token, API key, login token, claim code) per minute per client IP before 429. */
+    AUTH_FAILURE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(20),
+    /**
+     * Trust X-Forwarded-For only behind a reverse proxy you control (number of proxy hops). With the
+     * default 0 the API uses the socket address, so clients cannot fake their IP to dodge rate limits.
+     */
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === 'openai') {
@@ -42,6 +49,21 @@ const envSchema = z
   });
 
 export type AppConfig = z.infer<typeof envSchema>;
+
+/** Demo values shipped in the repository; fine locally, never for a real deployment. */
+const PLACEHOLDER_ADMIN_TOKENS = new Set(['local-admin-token-change-me', 'change-me-local-admin-token']);
+
+/** Configuration problems that do not stop a local demo but must be fixed before a real deployment. */
+export function securityWarnings(config: AppConfig): string[] {
+  const warnings: string[] = [];
+  if (config.NODE_ENV !== 'production') return warnings;
+  if (PLACEHOLDER_ADMIN_TOKENS.has(config.ADMIN_API_TOKEN) || config.ADMIN_API_TOKEN.length < 32) {
+    warnings.push('ADMIN_API_TOKEN is a demo placeholder or shorter than 32 characters. Set a long random token (e.g. openssl rand -base64 48).');
+  }
+  if (config.SEED_DEMO_DATA) warnings.push('SEED_DEMO_DATA is enabled; the demo API key is public. Disable it outside local demos.');
+  if (config.CORS_ORIGINS.some((origin) => origin === '*')) warnings.push('CORS_ORIGINS contains "*"; list the web app origins instead.');
+  return warnings;
+}
 
 /** Reads and validates configuration once at startup; invalid configuration stops the process. */
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {

@@ -56,7 +56,8 @@ export function createContainer(options: ContainerOptions) {
   const analytics = new PostgresAnalyticsRepository(pool);
   const aiProvider = options.aiProvider ?? createAIProvider(config);
 
-  const authenticate = new AuthenticateApiKeyQuery(new CachedApiKeyAccountRepository(repos.accounts));
+  const apiKeyCache = new CachedApiKeyAccountRepository(repos.accounts);
+  const authenticate = new AuthenticateApiKeyQuery(apiKeyCache);
   const accountUsageSummary = new GetAccountUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
   const adminAnalytics = new GetAdminAnalyticsQuery(analytics, repos.accounts, repos.usage, clock);
   const userUsageSummary = new GetUserUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
@@ -94,7 +95,7 @@ export function createContainer(options: ContainerOptions) {
     signup: {
       submit: new SubmitSignupRequestCommand(repos.signupRequests, repos.plans, clock),
       status: new GetSignupStatusQuery(repos.signupRequests),
-      claim: new ClaimSignupCommand(transactions, clock),
+      claim: new ClaimSignupCommand(transactions, clock, (previousHash) => apiKeyCache.invalidate(previousHash)),
       list: new ListSignupRequestsQuery(repos.signupRequests),
       approve: new ApproveSignupCommand(transactions, clock),
       reject: new RejectSignupCommand(transactions, clock),

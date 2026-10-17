@@ -15,7 +15,11 @@ ENV VITE_DATA_SOURCE=api \
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The API origin the browser may call (Content-Security-Policy connect-src).
+ARG API_ORIGIN=http://localhost:3000
+ENV API_ORIGIN=${API_ORIGIN}
+# The image renders /etc/nginx/templates/*.template into conf.d at start (envsubst).
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1

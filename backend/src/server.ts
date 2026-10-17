@@ -1,5 +1,5 @@
 import { buildApp } from './app';
-import { loadConfig } from './config/env';
+import { loadConfig, securityWarnings } from './config/env';
 import { createContainer } from './container';
 import { OpenAIProvider } from './Infrastructure/AI/Providers/OpenAIProvider';
 import { runMigrations } from './Infrastructure/Database/migrator';
@@ -23,10 +23,8 @@ async function main(): Promise<void> {
     app.log.info({ applied: applied.length }, 'migrations checked');
   }
   await seedPredefinedPlans(pool);
-  if (config.SEED_DEMO_DATA) {
-    await seedDemoData(pool, config.DEMO_API_KEY);
-    if (config.NODE_ENV === 'production') app.log.warn('SEED_DEMO_DATA is enabled; the demo API key is public. Disable it outside local demos.');
-  }
+  if (config.SEED_DEMO_DATA) await seedDemoData(pool, config.DEMO_API_KEY);
+  for (const warning of securityWarnings(config)) app.log.warn(`SECURITY: ${warning}`);
   app.log.info({ demoData: config.SEED_DEMO_DATA }, 'seed checked');
 
   if (container.aiProvider instanceof OpenAIProvider) {

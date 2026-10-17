@@ -2,6 +2,7 @@
 #   docker compose up --build
 # Web:  http://localhost:8080      API: http://localhost:3000/api/v1      Docs: http://localhost:3000/docs
 # Runs without an OpenAI key (AI_PROVIDER defaults to mock).
+# Ports are published on 127.0.0.1 only: the stack is reachable from this computer, not the network.
 name: usage-metering
 
 services:
@@ -15,7 +16,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       # Published on 5433 for local inspection (psql) without clashing with a native PostgreSQL.
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U metering -d metering"]
       interval: 3s
@@ -43,8 +44,10 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
+      # The API is reached directly (no reverse proxy), so X-Forwarded-For is not trusted.
+      TRUST_PROXY_HOPS: "0"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
   web:
     build:
@@ -52,11 +55,13 @@ services:
       args:
         VITE_API_BASE_URL: http://localhost:3000/api/v1
         VITE_DEMO_API_KEY: umk_demo_local_only_do_not_use_in_production
+        # Allowed in the page's Content-Security-Policy (connect-src).
+        API_ORIGIN: http://localhost:3000
     depends_on:
       api:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
 
 volumes:
   pgdata:

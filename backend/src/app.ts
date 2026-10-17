@@ -18,6 +18,7 @@ import { registerSignupRoutes } from './Presentation/Routes/signup.routes';
 import { registerUsageRoutes } from './Presentation/Routes/usage.routes';
 import { registerUserRoutes } from './Presentation/Routes/users.routes';
 import { requireApiKey } from './Shared/Middleware/auth';
+import { AuthFailureLimiter } from './Shared/Middleware/authFailureLimiter';
 import { generateRequestId } from './Shared/Middleware/requestId';
 
 export const API_PREFIX = '/api/v1';
@@ -42,10 +43,12 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
     bodyLimit: 64 * 1024,
     connectionTimeout: 15_000,
     requestTimeout: 30_000,
-    trustProxy: true,
+    // Hop count, not "true": with true any client could set X-Forwarded-For and pick its own IP.
+    trustProxy: config.TRUST_PROXY_HOPS > 0 ? (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS : false,
   });
 
-  registerErrorHandling(app);
+  const authFailures = new AuthFailureLimiter(config.AUTH_FAILURE_LIMIT_PER_MINUTE);
+  registerErrorHandling(app, authFailures);
   app.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
   });

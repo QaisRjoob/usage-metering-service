@@ -70,6 +70,13 @@ describe('role separation', () => {
     expect(await screen.findByLabelText('Access token or API key')).toBeInTheDocument();
   });
 
+  it('ends the session and returns to the login page when the server rejects the stored token', async () => {
+    credentials.setAdminToken('a-token-the-server-no-longer-accepts');
+    renderWithProviders(<AppRouter />, { route: '/admin/accounts' });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back' }, { timeout: 15_000 })).toBeInTheDocument();
+    expect(credentials.get().adminToken).toBeNull();
+  });
+
   it('signing in as one role ends the other session', () => {
     signInAsOperator();
     signInAsAccount();

@@ -105,6 +105,9 @@ migration check applied nothing new.
 
 A click-by-click tour of all pages is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
+The database design (tables, normal form, constraints, indexes) is in [docs/DATABASE.md](docs/DATABASE.md);
+permissions, page separation and security controls are in [docs/SECURITY.md](docs/SECURITY.md).
+
 ### Client Demo page (http://localhost:8080/app/demo)
 
 A simulated **document processor** — an external application — that calls the service with the demo

@@ -115,20 +115,25 @@ export class ClaimSignupCommand {
   constructor(
     private readonly transactions: TransactionManager,
     private readonly clock: Clock,
+    /** Called after commit with the hash of the replaced key (drops it from the lookup cache). */
+    private readonly onKeyReplaced: (previousHash: string) => void = () => {},
   ) {}
 
   async execute(credentials: SignupCredentials): Promise<ClaimSignupResponse> {
-    return this.transactions.run(async (repos) => {
+    let previousHash: string | null = null;
+    const result = await this.transactions.run(async (repos) => {
       const request = verified(await repos.signupRequests.findByIdForUpdate(credentials.requestId), credentials.claimCode);
       if (request.status !== 'approved' || !request.accountId) throw signupNotApproved(request.status);
       if (request.claimedAt) throw signupAlreadyClaimed();
       const key = generateApiKey();
       const now = this.clock.now();
-      await repos.accounts.updateApiKey(request.accountId, key.hash, key.prefix, now);
+      previousHash = await repos.accounts.updateApiKey(request.accountId, key.hash, key.prefix, now);
       await repos.signupRequests.markClaimed(request.id, now);
       const account = await repos.accounts.findById(request.accountId);
       return { account: toAccountSummary(account!), apiKey: key.raw };
     });
+    if (previousHash) this.onKeyReplaced(previousHash);
+    return result;
   }
 }
 

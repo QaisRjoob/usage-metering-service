@@ -35,7 +35,7 @@ export interface TestContext {
   close: () => Promise<void>;
 }
 
-export async function createTestContext(options: { aiProvider?: AIProvider; poolSize?: number } = {}): Promise<TestContext> {
+export async function createTestContext(options: { aiProvider?: AIProvider; poolSize?: number; env?: Record<string, string> } = {}): Promise<TestContext> {
   const config = loadConfig({
     ...process.env,
     NODE_ENV: 'test',
@@ -45,6 +45,9 @@ export async function createTestContext(options: { aiProvider?: AIProvider; pool
     AI_PROVIDER: 'mock',
     LOG_LEVEL: 'silent',
     AI_RATE_LIMIT_PER_WINDOW: '1000',
+    // Many tests send wrong credentials on purpose; security.test.ts checks the real limit.
+    AUTH_FAILURE_LIMIT_PER_MINUTE: '100000',
+    ...options.env,
   });
   const pool = createPool(TEST_DATABASE_URL, options.poolSize ?? 20);
   const clock = new TestClock();
