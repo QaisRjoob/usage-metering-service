@@ -19,6 +19,7 @@ export const routePaths = {
   account: {
     root: '/app',
     users: '/app/users',
+    userDetails: '/app/users/:userId',
     plans: '/app/plans',
     quotas: '/app/quotas',
     usage: '/app/usage',
@@ -31,5 +32,8 @@ export const buildAccountDetailsPath = (accountId: string): string => `/admin/ac
 
 /** Operator view of one user of a company (userId = the company's externalUserId). */
 export const buildOperatorUserPath = (accountId: string, userId: string): string => `/admin/accounts/${encodeURIComponent(accountId)}/users/${encodeURIComponent(userId)}`;
+
+/** A company's own view of one of its users. */
+export const buildAccountUserPath = (userId: string): string => `/app/users/${encodeURIComponent(userId)}`;
 
 export const homeFor = (role: 'operator' | 'account'): string => (role === 'operator' ? routePaths.operator.root : routePaths.account.root);

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ACTIVITY_FILTERS, type AccountSummary } from './accounts';
+import type { AccountSummary } from './accounts';
 import type { MonthlyUsagePoint } from './analytics';
-import { dateSchema, idSchema, monthSchema, percentFilterSchema, rangeChecks, searchSchema } from './common';
+import { ACTIVITY_FILTERS, dateSchema, idSchema, monthSchema, percentFilterSchema, rangeChecks, searchSchema } from './common';
 import { SORT_ORDERS, paginationQuerySchema, type PaginatedResponse } from './pagination';
 import type { Plan } from './plans';
 import { QUOTA_STATUSES, type QuotaSnapshot, type QuotaStatus } from './quota';
@@ -110,7 +110,10 @@ export interface AdminAccountUsageSummary extends AccountUsageSummary {
   monthly: MonthlyUsagePoint[];
 }
 
-/** GET /admin/accounts/:accountId/users/:userId - one user of a company, as the operator sees it. */
+/**
+ * One user with plan, both quotas, activity and trends. GET /admin/accounts/:accountId/users/:userId
+ * (operator) and GET /users/:userId/overview (the company itself) return the same shape.
+ */
 export interface AdminUserOverview extends UserUsageSummary {
   account: { id: string; name: string };
   plan: Plan;
@@ -118,6 +121,8 @@ export interface AdminUserOverview extends UserUsageSummary {
   /** Selected month and the five before it, for this user only. */
   monthly: MonthlyUsagePoint[];
 }
+
+export type UserOverview = AdminUserOverview;
 
 // ------------------------------------------------------------------ company statistics
 

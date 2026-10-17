@@ -14,6 +14,7 @@ import { UsageTrendChart } from '@/widgets/dashboard/UsageTrendChart';
 import { LastActivityCell } from '@/widgets/directory/ActivityCells';
 import { MonthlyTrendChart, RejectionChips, StatGrid, StatTile } from '@/widgets/insights/InsightWidgets';
 import { QuotaSnapshotCard } from '@/widgets/quotas/QuotaSnapshotCard';
+import { UserCategoryPanel } from '@/widgets/users/UserCategoryPanel';
 import { UserFilterBar } from '@/widgets/users/UserFilterBar';
 import { UsersTable } from '@/widgets/users/UsersTable';
 import { Button } from '@/widgets/ui/Button';
@@ -103,7 +104,8 @@ export default function AccountDetailsView() {
 
       <Card className="mt-6">
         <CardHeader title="Users" description={`Individual quotas for ${formatMonthLabel(vm.month)} · click a user for their statistics and activity`} />
-        <UserFilterBar list={vm.list} planOptions={vm.planOptions} planName={vm.planName} showMonth totalItems={vm.users.data?.totalItems} isFetching={vm.users.isFetching} />
+        <UserCategoryPanel facets={vm.userFacets.data} filters={vm.list.filters} set={vm.list.set} />
+        <UserFilterBar list={vm.list} planOptions={vm.planOptions} planName={vm.planName} showMonth categories totalItems={vm.users.data?.totalItems} isFetching={vm.users.isFetching} />
         {!vm.list.isValid ? (
           <p role="alert" className="m-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
             Fix the highlighted filter to see results.
@@ -115,6 +117,7 @@ export default function AccountDetailsView() {
             <UsersTable
               users={vm.users.data?.items}
               isLoading={vm.users.isPending || vm.users.isFetching}
+              showActivity
               sort={{ field: vm.list.sort, order: vm.list.order }}
               onSort={vm.list.setSort}
               onOpenUser={(user) => navigate(`${buildOperatorUserPath(accountId, user.externalUserId)}?month=${vm.month}`)}

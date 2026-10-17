@@ -1,14 +1,20 @@
 import type { ReactNode } from 'react';
+import type { ActivitySummary } from '@/models/directory';
 import type { UserWithQuota } from '@/models/user';
 import { formatUnits } from '@/utils/numberUtils';
 import { DataTable, type Column } from '@/widgets/common/DataTable';
 import { EmptyState } from '@/widgets/common/EmptyState';
 import { QuotaProgressBar } from '@/widgets/quotas/QuotaProgressBar';
 import { QuotaStatusBadge } from '@/widgets/quotas/QuotaStatusBadge';
+import { LastActivityCell, RequestCountsCell } from '@/widgets/directory/ActivityCells';
 import { Button } from '@/widgets/ui/Button';
 
+type UserRow = UserWithQuota & { activity?: ActivitySummary };
+
 interface UsersTableProps {
-  users: UserWithQuota[] | undefined;
+  users: UserRow[] | undefined;
+  /** Adds "Requests" and "Last request" columns (rows must carry `activity`). */
+  showActivity?: boolean;
   isLoading: boolean;
   onChangePlan?: (user: UserWithQuota) => void;
   emptyHint?: string;
@@ -20,8 +26,8 @@ interface UsersTableProps {
 }
 
 /** Users with their individual (user-level) quota for the selected month. */
-export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, onSort, emptyAction, onOpenUser }: UsersTableProps) {
-  const columns: Column<UserWithQuota>[] = [
+export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, onSort, emptyAction, onOpenUser, showActivity = false }: UsersTableProps) {
+  const columns: Column<UserRow>[] = [
     {
       key: 'user',
       header: 'User',
@@ -64,6 +70,12 @@ export function UsersTable({ users, isLoading, onChangePlan, emptyHint, sort, on
     },
     { key: 'status', header: 'Status', cell: (row) => <QuotaStatusBadge status={row.quota.status} />, hideBelow: 'lg' },
   ];
+  if (showActivity) {
+    columns.push(
+      { key: 'requests', header: 'Requests', sortKey: 'rejected', cell: (row) => (row.activity ? <RequestCountsCell activity={row.activity} /> : null), hideBelow: 'md' },
+      { key: 'lastActivity', header: 'Last request', sortKey: 'lastActivity', cell: (row) => <LastActivityCell lastRequestAt={row.activity?.lastRequestAt ?? null} />, hideBelow: 'lg' },
+    );
+  }
   if (onChangePlan) {
     columns.push({
       key: 'actions',

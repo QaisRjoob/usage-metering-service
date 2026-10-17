@@ -74,7 +74,7 @@ gets its own interface (own layout, menu and URL space); the other role's pages 
 | Interface | URL | Pages |
 |---|---|---|
 | Operator console | `/admin` | Overview (dashboard), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only company statistics: requests, rejection rate, daily chart, 6-month trend, users you can open), user details (one user's quotas, statistics, trends and request history), Company statistics (every company's usage, share, requests, rejection rate and active users, with totals), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
-| Account portal | `/app` | Overview, Users, Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
+| Account portal | `/app` | Overview, Users (category tabs with counts, activity columns, filters), user details (one user's quotas, statistics, trends and request history), Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
 
 Only one role is signed in at a time (signing in as one signs you out of the other), and the API
 enforces the same split independently: the admin token does not open account endpoints and an API
@@ -192,7 +192,7 @@ next to the field.
 |---|---|---|
 | `GET /admin/accounts` | `search` (name, account id, API key prefix, or a user's id / display name), `status`, `activity` (active/inactive this month), `hasRejections`, `planId`, `planKind` (predefined/custom), `minUsers`/`maxUsers`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `name`, `createdAt`, `utilization`, `consumed`, `userCount`, `lastActivity`, `rejected` |
 | `GET /admin/users` (every company) | `search` (user id, display name, internal id), `accountId`, `planId`, `status`, `activity`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `externalUserId`, `accountName`, `createdAt`, `utilization`, `consumed`, `lastActivity` (default), `rejected` |
-| `GET /users`, `GET /admin/accounts/:id/users`, `GET /quotas` | `search`, `status`, `planId`, `minUtilization`/`maxUtilization`, `month` (not on quotas) | `externalUserId`, `createdAt`, `utilization`, `consumed` |
+| `GET /users`, `GET /admin/accounts/:id/users`, `GET /quotas` | `search`, `status`, `planId`, `activity` (active/inactive this month), `hasRejections`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo` (registration), `month` (not on quotas) | `externalUserId`, `createdAt`, `utilization`, `consumed`, `lastActivity`, `rejected` |
 | `GET /usage`, `GET /admin/usage` | `userId`, `outcome`, `rule`, `level`, `minUnits`/`maxUnits`, `requestId` (contains), `replayed`, `month`, `from`/`to`; admin adds `accountId` | `createdAt`, `units` |
 | `GET /plans`, `GET /admin/plans` | `search`, `scope`, `kind`; admin adds `ownerAccountId` | `name`, `createdAt`, `monthlyAllowance`, `maxUnitsPerRequest` |
 

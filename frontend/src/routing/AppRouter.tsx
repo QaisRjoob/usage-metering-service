@@ -7,6 +7,7 @@ import {
   AccountDetailsView,
   AccountOverviewView,
   AccountUsageHistoryView,
+  AccountUserDetailsView,
   AccountsView,
   ClientDemoView,
   CompanyStatsView,
@@ -60,6 +61,7 @@ export function AppRouter() {
       >
         <Route path={acc.root} element={<Lazy view={<AccountOverviewView />} />} />
         <Route path={acc.users} element={<Lazy view={<UsersView />} />} />
+        <Route path={acc.userDetails} element={<Lazy view={<AccountUserDetailsView />} />} />
         <Route path={acc.plans} element={<Lazy view={<PlansView />} />} />
         <Route path={acc.quotas} element={<Lazy view={<QuotasView />} />} />
         <Route path={acc.usage} element={<Lazy view={<AccountUsageHistoryView />} />} />

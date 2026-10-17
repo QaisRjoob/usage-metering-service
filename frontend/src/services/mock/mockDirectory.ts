@@ -10,10 +10,10 @@ import {
   userFacetsQuerySchema,
   type QuotaStatus,
 } from '@/contracts';
-import type { AccountFacets, AdminUserListItem, CompanyStatsRow, PlanFacet } from '@/models/directory';
+import type { AccountFacets, AdminUserListItem, AdminUserOverview, CompanyStatsRow, PlanFacet } from '@/models/directory';
 import type { DirectoryService } from '@/services/directoryService';
 import type { AccountRow, MockDatabase, UserRow } from './mockDatabase';
-import { notFound, pageOf, requireAdmin, simulate, validate } from './mockRuntime';
+import { compareNullsLast, notFound, pageOf, requireAdmin, simulate, validate } from './mockRuntime';
 
 const percent = (part: number, whole: number) => (whole === 0 ? 0 : Math.round((part * 1000) / whole) / 10);
 
@@ -33,15 +33,7 @@ function userMatches(user: UserRow, search: string): boolean {
   return user.externalUserId.toLowerCase().includes(text) || (user.displayName ?? '').toLowerCase().includes(text) || user.id.includes(text);
 }
 
-/** Missing values go last in both directions, like SQL "NULLS LAST". */
-export function compareNullsLast(a: string | null, b: string | null, direction: 1 | -1): number {
-  if (a === b) return 0;
-  if (a === null) return 1;
-  if (b === null) return -1;
-  return a.localeCompare(b) * direction;
-}
-
-function facetsOf(db: MockDatabase, items: { status: QuotaStatus; planId: string; active: boolean }[], period: string): AccountFacets {
+export function facetsOf(db: MockDatabase, items: { status: QuotaStatus; planId: string; active: boolean }[], period: string): AccountFacets {
   const byStatus = Object.fromEntries(QUOTA_STATUSES.map((status) => [status, 0])) as Record<QuotaStatus, number>;
   const plans = new Map<string, PlanFacet>();
   let active = 0;
@@ -72,7 +64,18 @@ function directoryUser(db: MockDatabase, user: UserRow, period: string): AdminUs
   };
 }
 
-const isActive = (activity: { acceptedRequests: number; rejectedRequests: number }) => activity.acceptedRequests + activity.rejectedRequests > 0;
+/** One user's overview (same shape for the operator and the company). */
+export function userOverviewOf(db: MockDatabase, account: AccountRow, user: UserRow, period: string): AdminUserOverview {
+  return {
+    ...db.userUsageSummary(account, user, period),
+    account: { id: account.id, name: account.name },
+    plan: db.planDto(db.plans.get(user.planId)!),
+    activity: db.activity((row) => row.userId === user.id, period),
+    monthly: db.monthlyFor(period, { accountId: account.id, userId: user.id }),
+  };
+}
+
+export const isActive = (activity: { acceptedRequests: number; rejectedRequests: number }) => activity.acceptedRequests + activity.rejectedRequests > 0;
 
 export function createMockDirectoryService(): DirectoryService {
   return {
@@ -180,15 +183,7 @@ export function createMockDirectoryService(): DirectoryService {
         const account = db.getAccount(accountId);
         const user = db.findUser(account.id, userId);
         if (!user) throw notFound(ERROR_CODES.USER_NOT_FOUND, `User "${userId}" was not found in this account.`);
-        const period = month ?? db.currentPeriod();
-        const summary = db.userUsageSummary(account, user, period);
-        return {
-          ...summary,
-          account: { id: account.id, name: account.name },
-          plan: db.planDto(db.plans.get(user.planId)!),
-          activity: db.activity((row) => row.userId === user.id, period),
-          monthly: db.monthlyFor(period, { accountId: account.id, userId: user.id }),
-        };
+        return userOverviewOf(db, account, user, month ?? db.currentPeriod());
       }),
 
     companyStats: (params) =>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateSchema, idSchema, monthSchema, percentFilterSchema, queryBooleanSchema, rangeChecks, searchSchema } from './common';
+import { ACTIVITY_FILTERS, dateSchema, idSchema, monthSchema, percentFilterSchema, queryBooleanSchema, rangeChecks, searchSchema } from './common';
 import { SORT_ORDERS, paginationQuerySchema } from './pagination';
 import { PLAN_KINDS, type Plan } from './plans';
 import { QUOTA_STATUSES, type QuotaSnapshot } from './quota';
@@ -45,10 +45,6 @@ export type CreateAccountRequest = z.infer<typeof createAccountSchema>;
 
 /** Whitelisted sort fields; anything else is a 400. */
 export const ACCOUNT_SORT_FIELDS = ['name', 'createdAt', 'utilization', 'consumed', 'userCount', 'lastActivity', 'rejected'] as const;
-
-/** active = at least one consume request in the selected month. */
-export const ACTIVITY_FILTERS = ['active', 'inactive'] as const;
-export type ActivityFilter = (typeof ACTIVITY_FILTERS)[number];
 export type AccountSortField = (typeof ACCOUNT_SORT_FIELDS)[number];
 
 /**

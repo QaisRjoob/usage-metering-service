@@ -2,7 +2,7 @@
  * MOCK ADAPTER RUNTIME - shared helpers for the mock services: the singleton mock database,
  * simulated latency, credential checks that mirror the API (401/404 semantics) and validation.
  */
-import { ERROR_CODES, buildPage, paginationQuerySchema, type ListUsersParams, type PaginatedResponse, type UserWithQuota } from '@/contracts';
+import { ERROR_CODES, buildPage, paginationQuerySchema, type ListUsersParams, type PaginatedResponse, type UserListItem } from '@/contracts';
 import type { ZodType } from 'zod';
 import { ApiError } from '@/services/api/apiErrors';
 import { credentials } from '@/services/api/credentials';
@@ -93,24 +93,39 @@ export function pageOf<T>(items: T[], params: { page?: number; pageSize?: number
   return buildPage(items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, items.length);
 }
 
-/** Users of one account with their quota, filtered like the API's users list. */
-export function filteredUsers(db: MockDatabase, accountId: string, params: Omit<ListUsersParams, 'month'>, period: string): UserWithQuota[] {
+/** Missing values go last in both directions, like SQL "NULLS LAST". */
+export function compareNullsLast(a: string | null, b: string | null, direction: 1 | -1): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a.localeCompare(b) * direction;
+}
+
+/** Users of one account with their quota and activity, filtered like the API's users list. */
+export function filteredUsers(db: MockDatabase, accountId: string, params: Omit<ListUsersParams, 'month'>, period: string): UserListItem[] {
   const search = params.search?.trim().toLowerCase();
   return db
     .accountUsers(accountId)
     .filter((user) => !search || user.externalUserId.toLowerCase().includes(search) || (user.displayName ?? '').toLowerCase().includes(search))
     .filter((user) => !params.planId || user.planId === params.planId)
-    .map((user) => db.userWithQuota(user, period))
+    .filter((user) => !params.createdFrom || user.createdAt.slice(0, 10) >= params.createdFrom)
+    .filter((user) => !params.createdTo || user.createdAt.slice(0, 10) <= params.createdTo)
+    .map((user) => ({ ...db.userWithQuota(user, period), activity: db.activity((row) => row.userId === user.id, period) }))
     .filter((user) => !params.status || user.quota.status === params.status)
     .filter((user) => params.minUtilization === undefined || user.quota.utilizationPercent >= params.minUtilization)
     .filter((user) => params.maxUtilization === undefined || user.quota.utilizationPercent <= params.maxUtilization)
+    .filter((user) => !params.activity || (params.activity === 'active') === user.activity.acceptedRequests + user.activity.rejectedRequests > 0)
+    .filter((user) => params.hasRejections === undefined || params.hasRejections === user.activity.rejectedRequests > 0)
     .sort((a, b) => {
       const direction = params.order === 'desc' ? -1 : 1;
+      if (params.sort === 'lastActivity') return compareNullsLast(a.activity.lastRequestAt, b.activity.lastRequestAt, direction) || a.id.localeCompare(b.id) * direction;
       const primary =
         params.sort === 'utilization'
           ? a.quota.utilizationPercent - b.quota.utilizationPercent
           : params.sort === 'consumed'
             ? a.quota.consumed - b.quota.consumed
+            : params.sort === 'rejected'
+              ? a.activity.rejectedRequests - b.activity.rejectedRequests
             : params.sort === 'createdAt'
               ? a.createdAt.localeCompare(b.createdAt)
               : a.externalUserId.localeCompare(b.externalUserId);

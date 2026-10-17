@@ -72,3 +72,7 @@ export const requestIdSchema = z
   .regex(/^[A-Za-z0-9._:-]+$/, 'requestId may contain letters, digits and . _ : -');
 
 export type UtcMonth = string;
+
+/** active = at least one consume request in the selected month. */
+export const ACTIVITY_FILTERS = ['active', 'inactive'] as const;
+export type ActivityFilter = (typeof ACTIVITY_FILTERS)[number];

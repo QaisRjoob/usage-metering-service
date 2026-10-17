@@ -7,7 +7,7 @@ import type {
   ListAccountsParams,
 } from '@/models/account';
 import type { PaginatedResponse } from '@/models/pagination';
-import type { ListUsersParams, UserWithQuota } from '@/models/user';
+import type { ListUsersParams, UserListItem } from '@/models/user';
 import { apiRequest } from './api/apiClient';
 import { endpoints } from './api/endpoints';
 
@@ -17,7 +17,7 @@ export interface AccountService {
   /** Operator: one account, its plan and quota for a month. */
   getAccount(accountId: string, month?: string): Promise<AccountDetails>;
   /** Operator: an account's users with their individual quota for a month (read-only). */
-  listAccountUsers(accountId: string, params: ListUsersParams): Promise<PaginatedResponse<UserWithQuota>>;
+  listAccountUsers(accountId: string, params: ListUsersParams): Promise<PaginatedResponse<UserListItem>>;
   /** Operator: creates an account and returns its API key once. */
   createAccount(request: CreateAccountRequest): Promise<CreateAccountResponse>;
   /** Account scope: the account identified by the connected API key. */

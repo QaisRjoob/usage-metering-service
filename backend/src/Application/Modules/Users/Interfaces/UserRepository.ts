@@ -15,6 +15,11 @@ export interface UserQuotaRow {
   consumed: number;
 }
 
+/** A user of one account with the request activity of the period. */
+export interface UserListRow extends UserQuotaRow {
+  activity: ActivityRow;
+}
+
 export interface UserListFilter {
   period: QuotaPeriod;
   search?: string;
@@ -22,6 +27,11 @@ export interface UserListFilter {
   status?: QuotaStatus;
   minUtilization?: number;
   maxUtilization?: number;
+  activity?: ActivityFilter;
+  hasRejections?: boolean;
+  /** Inclusive UTC dates, YYYY-MM-DD. */
+  createdFrom?: string;
+  createdTo?: string;
   sort?: UserSortField;
   order?: SortOrder;
 }
@@ -56,7 +66,7 @@ export interface UserRepository {
   create(input: { accountId: string; externalUserId: string; displayName: string | null; planId: string; createdAt: Date }): Promise<UsageSubject>;
   updatePlan(userId: string, planId: string, updatedAt: Date): Promise<void>;
   getQuotaRow(accountId: string, externalUserId: string, period: QuotaPeriod): Promise<UserQuotaRow | null>;
-  list(accountId: string, filter: UserListFilter, window: PageWindow): Promise<{ rows: UserQuotaRow[]; total: number }>;
+  list(accountId: string, filter: UserListFilter, window: PageWindow): Promise<{ rows: UserListRow[]; total: number }>;
   /** Users of an account ordered by utilization, highest first. */
   topByUtilization(accountId: string, period: QuotaPeriod, limit: number): Promise<UserQuotaRow[]>;
   statusCounts(accountId: string, period: QuotaPeriod): Promise<{ total: number; approachingLimit: number; atOrOverLimit: number }>;

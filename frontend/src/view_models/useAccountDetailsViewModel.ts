@@ -5,7 +5,7 @@ import { useServices } from '@/providers/ServicesProvider';
 import { currentUtcMonth } from '@/utils/dateUtils';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
-export const ACCOUNT_USER_FILTER_FIELDS = ['search', 'status', 'planId', 'minUtilization', 'maxUtilization', 'month'] as const;
+export const ACCOUNT_USER_FILTER_FIELDS = ['search', 'status', 'activity', 'planId', 'hasRejections', 'minUtilization', 'maxUtilization', 'createdFrom', 'createdTo', 'month'] as const;
 
 /**
  * Operator view of one account: read-only. Users are managed by the account itself in its own
@@ -45,6 +45,16 @@ export function useAccountDetailsViewModel(accountId: string) {
   });
   const userPlans = [...(predefined.data?.items ?? []), ...(custom.data?.items ?? [])];
 
+  // Category counts of this company's users (status, activity, plan) within the search and month.
+  const facetParams = { accountId, search: list.query?.search, month };
+  const userFacets = useQuery({
+    queryKey: queryKeys.admin.userFacets(facetParams),
+    queryFn: () => services.directory.userFacets(facetParams),
+    enabled: list.isValid,
+    staleTime: staleTimes.quota,
+    placeholderData: keepPreviousData,
+  });
+
   // Company statistics: requests, daily series, rejections by rule, top users and a 6-month trend.
   const summary = useQuery({
     queryKey: queryKeys.admin.accountSummary(accountId, month),
@@ -67,6 +77,7 @@ export function useAccountDetailsViewModel(accountId: string) {
     account,
     summary,
     users,
+    userFacets,
     recent,
     planOptions: userPlans.map((plan) => ({ value: plan.id, label: plan.isPredefined ? plan.name : `${plan.name} (custom)` })),
     planName: (planId: string) => userPlans.find((plan) => plan.id === planId)?.name ?? 'selected plan',

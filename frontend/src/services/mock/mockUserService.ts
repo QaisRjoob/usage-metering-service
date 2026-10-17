@@ -1,8 +1,9 @@
 /** MOCK ADAPTER - implements UserService against the in-memory mock database. */
-import { ERROR_CODES, assignPlanSchema, createUserSchema, listUsersQuerySchema, monthSchema } from '@/contracts';
+import { ERROR_CODES, accountUserFacetsQuerySchema, assignPlanSchema, createUserSchema, listUsersQuerySchema, monthSchema } from '@/contracts';
 import type { UserDetails } from '@/models/user';
 import type { UserService } from '@/services/userService';
 import type { AccountRow, MockDatabase, UserRow } from './mockDatabase';
+import { facetsOf, isActive, userOverviewOf } from './mockDirectory';
 import { PREDEFINED_PLAN_IDS } from './mockSeed';
 import { conflict, filteredUsers, pageOf, requireAccount, simulate, unprocessable, validate } from './mockRuntime';
 
@@ -23,6 +24,21 @@ export function createMockUserService(): UserService {
         const account = requireAccount(db);
         const query = validate(listUsersQuerySchema, params);
         return pageOf(filteredUsers(db, account.id, query, query.month ?? db.currentPeriod()), query);
+      }),
+
+    userFacets: (params) =>
+      simulate((db) => {
+        const account = requireAccount(db);
+        const query = validate(accountUserFacetsQuerySchema, params);
+        const period = query.month ?? db.currentPeriod();
+        const items = filteredUsers(db, account.id, { search: query.search }, period).map((user) => ({ status: user.quota.status, planId: user.quota.planId, active: isActive(user.activity) }));
+        return facetsOf(db, items, period);
+      }),
+
+    getUserOverview: (userId, month) =>
+      simulate((db) => {
+        const account = requireAccount(db);
+        return userOverviewOf(db, account, db.getUser(account.id, userId), month ?? db.currentPeriod());
       }),
 
     getUser: (userId) =>

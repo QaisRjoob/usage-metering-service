@@ -6,7 +6,7 @@ import { useListQuery } from '@/hooks/useListQuery';
 import { useServices } from '@/providers/ServicesProvider';
 import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
-export const USER_FILTER_FIELDS = ['search', 'status', 'planId', 'minUtilization', 'maxUtilization', 'month'] as const;
+export const USER_FILTER_FIELDS = ['search', 'status', 'activity', 'planId', 'hasRejections', 'minUtilization', 'maxUtilization', 'createdFrom', 'createdTo', 'month'] as const;
 
 /** Account portal: the company's own users - list with filters, register, change plan. */
 export function useUsersViewModel() {
@@ -19,6 +19,16 @@ export function useUsersViewModel() {
   const users = useQuery({
     queryKey: queryKeys.account.users(accountId, list.query ?? {}),
     queryFn: () => services.users.listUsers(list.query!),
+    enabled: list.isValid,
+    staleTime: staleTimes.quota,
+    placeholderData: keepPreviousData,
+  });
+
+  // Category counts follow the search text and month only.
+  const facetParams = { search: list.query?.search, month: list.query?.month };
+  const facets = useQuery({
+    queryKey: queryKeys.account.userFacets(accountId, facetParams),
+    queryFn: () => services.users.userFacets(facetParams),
     enabled: list.isValid,
     staleTime: staleTimes.quota,
     placeholderData: keepPreviousData,
@@ -43,6 +53,7 @@ export function useUsersViewModel() {
   return {
     list,
     users,
+    facets,
     plans: allPlans,
     planOptions: userPlans.map((plan) => ({ value: plan.id, label: plan.isPredefined ? plan.name : `${plan.name} (custom)` })),
     planName: (planId: string) => userPlans.find((plan) => plan.id === planId)?.name ?? 'selected plan',

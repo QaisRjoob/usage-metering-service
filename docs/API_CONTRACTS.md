@@ -132,11 +132,13 @@ cookie: the client then sends the token as `Authorization: Bearer` (operator) or
 | GET | `/account` | — | `CurrentAccountResponse { account, plan, quota }` |
 | PUT | `/account/plan` | `{ planId }` (account-scope plan) | `CurrentAccountResponse` |
 | GET | `/account/usage-summary` | `month?` | `AccountUsageSummary` |
-| GET | `/users` | `page, pageSize, search?, planId?, status?, minUtilization?, maxUtilization?, month?, sort=externalUserId\|createdAt\|utilization\|consumed, order` | `Paginated<UserWithQuota>` |
+| GET | `/users` | `page, pageSize, search?, planId?, status?, activity?=active\|inactive, hasRejections?, minUtilization?, maxUtilization?, createdFrom?, createdTo?, month?, sort=externalUserId\|createdAt\|utilization\|consumed\|lastActivity\|rejected, order` | `Paginated<UserListItem>` (user + quota + `activity`) |
+| GET | `/account/user-facets` | `search?, month?` | `UserFacets` — your users per status, plan and activity (within `search`) |
 | POST | `/users` | `{ externalUserId, displayName?, planId? }` (default Basic) | `201 UserWithQuota` |
 | GET | `/users/:userId` | — | `UserDetails { user, plan, quota, accountQuota }` |
 | PUT | `/users/:userId/plan` | `{ planId }` (user-scope plan) | `UserDetails` |
 | GET | `/users/:userId/usage-summary` | `month?` | `UserUsageSummary` |
+| GET | `/users/:userId/overview` | `month?` | `UserOverview` (same shape as the operator's `AdminUserOverview`: summary + `plan`, `activity`, 6-month `monthly`) |
 | GET | `/plans` | `page, pageSize, search?, scope?, kind=predefined\|custom, sort?=name\|createdAt\|monthlyAllowance\|maxUnitsPerRequest, order` | `Paginated<Plan>` (predefined + own custom; no sort = predefined first) |
 | POST | `/plans` | `{ name, description?, scope, monthlyAllowance, maxUnitsPerRequest }` | `201 PlanDetails` |
 | GET | `/plans/:planId` | — | `PlanDetails` (with all versions) |

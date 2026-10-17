@@ -29,6 +29,7 @@ export const endpoints = {
     current: '/account',
     plan: '/account/plan',
     usageSummary: '/account/usage-summary',
+    userFacets: '/account/user-facets',
   },
 
   users: {
@@ -36,6 +37,7 @@ export const endpoints = {
     detail: (userId: string) => `/users/${segment(userId)}`,
     plan: (userId: string) => `/users/${segment(userId)}/plan`,
     usageSummary: (userId: string) => `/users/${segment(userId)}/usage-summary`,
+    overview: (userId: string) => `/users/${segment(userId)}/overview`,
   },
 
   plans: {

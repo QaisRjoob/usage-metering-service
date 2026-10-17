@@ -1,6 +1,6 @@
 import type { PageWindow } from '../../Application/Common/Pagination/pagination';
 import type { AdminSearchResult, UserFacets } from '../../contracts';
-import type { DirectoryUserFilter, DirectoryUserRow, UserListFilter, UserQuotaRow, UserRepository } from '../../Application/Modules/Users/Interfaces/UserRepository';
+import type { DirectoryUserFilter, DirectoryUserRow, UserListFilter, UserListRow, UserQuotaRow, UserRepository } from '../../Application/Modules/Users/Interfaces/UserRepository';
 import { periodToDate, type QuotaPeriod } from '../../Domain/Quotas/QuotaPeriod';
 import { userAlreadyExists, type UsageSubject } from '../../Domain/Users/UsageSubject';
 import { PG_ERROR, pgErrorCode, type Queryable } from '../Database/postgres';
@@ -89,14 +89,7 @@ const UTILIZATION = utilizationSql('pv.monthly_allowance', CONSUMED);
 
 const STATUS = statusSql('pv.monthly_allowance', CONSUMED);
 
-/** Whitelisted sort keys -> SQL. */
-const SORT_SQL: Record<NonNullable<UserListFilter['sort']>, string> = {
-  externalUserId: 'u.external_user_id',
-  createdAt: 'u.created_at',
-  utilization: UTILIZATION,
-  consumed: CONSUMED,
-};
-
+/** Whitelisted sort keys -> SQL (one company's list uses a subset of the directory's keys). */
 const DIRECTORY_SORT_SQL: Record<DirectoryUserFilter['sort'], string> = {
   externalUserId: 'u.external_user_id',
   createdAt: 'u.created_at',
@@ -155,30 +148,40 @@ export class PostgresUserRepository implements UserRepository {
     return rows[0] ? toQuotaRow(rows[0]) : null;
   }
 
-  async list(accountId: string, filter: UserListFilter, window: PageWindow): Promise<{ rows: UserQuotaRow[]; total: number }> {
+  async list(accountId: string, filter: UserListFilter, window: PageWindow): Promise<{ rows: UserListRow[]; total: number }> {
     const params = new SqlParams();
     params.add(periodToDate(filter.period));
-    params.add(accountId);
-    const conditions: string[] = [];
+    // Search here matches the user id and display name only (the caller knows its own users).
+    const conditions = [`u.account_id = ${params.add(accountId)}`];
     if (filter.search) {
       const pattern = params.add(likePattern(filter.search));
       conditions.push(`(u.external_user_id ILIKE ${pattern} OR u.display_name ILIKE ${pattern})`);
     }
     if (filter.planId) conditions.push(`u.plan_id = ${params.add(filter.planId)}`);
-    if (filter.status) conditions.push(`${statusSql('pv.monthly_allowance', CONSUMED)} = ${params.add(filter.status)}`);
+    if (filter.status) conditions.push(`${STATUS} = ${params.add(filter.status)}`);
     if (filter.minUtilization !== undefined) conditions.push(`${UTILIZATION} >= ${params.add(filter.minUtilization)}`);
     if (filter.maxUtilization !== undefined) conditions.push(`${UTILIZATION} <= ${params.add(filter.maxUtilization)}`);
-    const extra = conditions.map((condition) => ` AND ${condition}`).join('');
+    if (filter.activity) conditions.push(`${filter.activity === 'active' ? '' : 'NOT '}(act.accepted_requests + act.rejected_requests) > 0`);
+    if (filter.hasRejections !== undefined) conditions.push(filter.hasRejections ? 'act.rejected_requests > 0' : 'act.rejected_requests = 0');
+    if (filter.createdFrom) conditions.push(`u.created_at >= ${params.add(filter.createdFrom)}::date`);
+    if (filter.createdTo) conditions.push(`u.created_at < (${params.add(filter.createdTo)}::date + 1)`);
+    const where = whereOf(conditions);
     const direction = filter.order === 'desc' ? 'DESC' : 'ASC';
 
-    const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total ${QUOTA_FROM}${extra}`, params.values);
+    const countResult = await this.db.query<{ total: number }>(`SELECT count(*) AS total ${DIRECTORY_FROM} ${where}`, params.values);
     const limit = params.add(window.limit);
     const offset = params.add(window.offset);
-    const { rows } = await this.db.query<UserQuotaColumns>(
-      `${QUOTA_SELECT}${extra} ORDER BY ${SORT_SQL[filter.sort ?? 'externalUserId']} ${direction}, u.id ${direction} LIMIT ${limit} OFFSET ${offset}`,
+    const { rows } = await this.db.query<DirectoryColumns>(
+      `${DIRECTORY_SELECT} ${where} ORDER BY ${DIRECTORY_SORT_SQL[filter.sort ?? 'externalUserId']} ${direction} NULLS LAST, u.id ${direction} LIMIT ${limit} OFFSET ${offset}`,
       params.values,
     );
-    return { rows: rows.map(toQuotaRow), total: countResult.rows[0]?.total ?? 0 };
+    return {
+      rows: rows.map((row) => ({
+        ...toQuotaRow(row),
+        activity: { acceptedRequests: row.accepted_requests, rejectedRequests: row.rejected_requests, lastRequestAt: row.last_request_at },
+      })),
+      total: countResult.rows[0]?.total ?? 0,
+    };
   }
 
   async topByUtilization(accountId: string, period: QuotaPeriod, limit: number): Promise<UserQuotaRow[]> {

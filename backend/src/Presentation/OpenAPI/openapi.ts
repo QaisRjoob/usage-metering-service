@@ -1,5 +1,6 @@
 import {
   accountFacetsQuerySchema,
+  accountUserFacetsQuerySchema,
   adminListPlansQuerySchema,
   adminListUsageQuerySchema,
   adminListUsersQuerySchema,
@@ -77,6 +78,8 @@ const routes: RouteDoc[] = [
   { method: 'get', path: '/users/{userId}', tag: 'Users', summary: 'User, plan and both quota levels', security: 'apiKey', params: ['userId'], response: 'Object' },
   { method: 'put', path: '/users/{userId}/plan', tag: 'Users', summary: "Assign or switch a user's plan (keeps consumed units)", security: 'apiKey', params: ['userId'], body: assignPlanSchema, response: 'Object' },
   { method: 'get', path: '/users/{userId}/usage-summary', tag: 'Users', summary: 'User usage summary for a month', security: 'apiKey', params: ['userId'], query: monthQuery, response: 'Object' },
+  { method: 'get', path: '/users/{userId}/overview', tag: 'Users', summary: 'One user: plan, both quotas, activity, daily series, rejections and a 6-month trend', security: 'apiKey', params: ['userId'], query: monthQuery, response: 'Object' },
+  { method: 'get', path: '/account/user-facets', tag: 'Users', summary: 'Your users per status, plan and activity (within search)', security: 'apiKey', query: accountUserFacetsQuerySchema, response: 'Object' },
 
   { method: 'get', path: '/plans', tag: 'Plans', summary: 'Predefined plans and the accountâ€™s custom plans', security: 'apiKey', query: listPlansQuerySchema, response: 'Page<Plan>' },
   { method: 'post', path: '/plans', tag: 'Plans', summary: 'Create a custom plan', security: 'apiKey', body: createPlanSchema, status: 201, response: 'Plan' },

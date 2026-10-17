@@ -38,6 +38,7 @@ describe('account interface (/app)', () => {
   it.each([
     ['/app', 'Welcome, Demo Docs Inc'],
     ['/app/users', 'Users'],
+    ['/app/users/alice', 'alice'],
     ['/app/plans', 'Plans'],
     ['/app/quotas', 'Quotas'],
     ['/app/usage', 'Usage history'],
@@ -240,6 +241,21 @@ describe('server-side filters, sorting and pagination', () => {
     await waitFor(() => expect(header.closest('th')).toHaveAttribute('aria-sort', 'descending'));
     await user.click(within(screen.getByRole('radiogroup', { name: 'Activity' })).getByRole('radio', { name: 'No requests' }));
     expect(await screen.findByRole('button', { name: 'Remove filter Activity: inactive' })).toBeInTheDocument();
+  });
+
+  it('browses the company\'s own users by category and opens one of them', async () => {
+    const user = userEvent.setup();
+    signInAsAccount();
+    renderWithProviders(<AppRouter />, { route: '/app/users' });
+    const plan = await screen.findByRole('radiogroup', { name: 'User plan' }, { timeout: 15_000 });
+    const premium = await within(plan).findByRole('radio', { name: 'Premium 1' });
+    await user.click(premium);
+    expect(await screen.findByText('1 result')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove filter Plan: Premium' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Details of bob' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'bob' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Request history' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'All users' })).toBeInTheDocument();
   });
 
   it('shows the mock data badge in mock mode', async () => {

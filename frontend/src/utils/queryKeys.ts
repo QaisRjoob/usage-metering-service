@@ -2,7 +2,7 @@ import type { ListAccountsParams } from '@/models/account';
 import type { AccountFacetsParams, AdminListUsersParams, CompanyStatsParams, UserFacetsParams } from '@/models/directory';
 import type { AdminListPlansParams, ListPlansParams } from '@/models/plan';
 import type { AdminListUsageParams, ListUsageParams } from '@/models/usage-record';
-import type { ListUsersParams } from '@/models/user';
+import type { AccountUserFacetsParams, ListUsersParams } from '@/models/user';
 import type { QuotasParams } from '@/services/quotaService';
 
 /**
@@ -38,6 +38,8 @@ export const queryKeys = {
     quotas: (accountId: string, params: QuotasParams) => ['account', accountId, 'quotas', params] as const,
     usageSummary: (accountId: string, month: string) => ['account', accountId, 'usage-summary', month] as const,
     usage: (accountId: string, params: ListUsageParams) => ['account', accountId, 'usage', params] as const,
+    userFacets: (accountId: string, params: AccountUserFacetsParams) => ['account', accountId, 'user-facets', params] as const,
+    userOverview: (accountId: string, userId: string, month: string) => ['account', accountId, 'user-overview', userId, month] as const,
   },
 };
 

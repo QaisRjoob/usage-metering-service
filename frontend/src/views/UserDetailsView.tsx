@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ArrowLeft, Eye } from 'lucide-react';
 import type { UsageRecord } from '@/models/usage-record';
+import { useCredentials } from '@/hooks/useCredentials';
 import { useServices } from '@/providers/ServicesProvider';
 import { buildAccountDetailsPath, routePaths } from '@/routing/routePaths';
 import { currentUtcMonth, formatMonthLabel, formatUtcDateTime, isValidMonth } from '@/utils/dateUtils';
@@ -41,9 +42,17 @@ const historyColumns: Column<UsageRecord>[] = [
   { key: 'replays', header: 'Retries', cell: (row) => (row.replayCount > 0 ? `${row.replayCount}×` : '—'), align: 'right', hideBelow: 'lg' },
 ];
 
-/** Operator: one user of a company - plan, both quotas, statistics, trends and request history (read-only). */
-export default function OperatorUserDetailsView() {
-  const { accountId = '', userId = '' } = useParams();
+type Scope = 'operator' | 'account';
+
+/**
+ * One user - plan, both quotas, statistics, trends and request history. The operator reaches it
+ * from any company (read-only); a company from its own Users page (its API key decides the account).
+ */
+function UserDetailsPage({ scope }: { scope: Scope }) {
+  const params = useParams();
+  const { account: session } = useCredentials();
+  const accountId = scope === 'operator' ? (params.accountId ?? '') : (session?.accountId ?? '');
+  const userId = params.userId ?? '';
   const services = useServices();
   const [searchParams, setSearchParams] = useSearchParams();
   const monthParam = searchParams.get('month');
@@ -64,22 +73,26 @@ export default function OperatorUserDetailsView() {
     );
 
   const overview = useQuery({
-    queryKey: queryKeys.admin.userOverview(accountId, userId, month),
-    queryFn: () => services.directory.userOverview(accountId, userId, month),
+    queryKey: scope === 'operator' ? queryKeys.admin.userOverview(accountId, userId, month) : queryKeys.account.userOverview(accountId, userId, month),
+    queryFn: () => (scope === 'operator' ? services.directory.userOverview(accountId, userId, month) : services.users.getUserOverview(userId, month)),
     staleTime: staleTimes.summary,
     placeholderData: keepPreviousData,
   });
-  const historyParams = { accountId, userId, month, page, pageSize };
+  const historyParams = { userId, month, page, pageSize };
   const history = useQuery({
-    queryKey: queryKeys.admin.usage(historyParams),
-    queryFn: () => services.usage.getAdminUsageHistory(historyParams),
+    queryKey: scope === 'operator' ? queryKeys.admin.usage({ ...historyParams, accountId }) : queryKeys.account.usage(accountId, historyParams),
+    queryFn: () =>
+      scope === 'operator' ? services.usage.getAdminUsageHistory({ ...historyParams, accountId }) : services.usage.getUsageHistory(historyParams),
     staleTime: staleTimes.usage,
     placeholderData: keepPreviousData,
   });
 
   const backLink = (
-    <Link to={buildAccountDetailsPath(accountId)} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-      <ArrowLeft className="size-4" aria-hidden="true" /> {overview.data ? overview.data.account.name : 'Company'}
+    <Link
+      to={scope === 'operator' ? buildAccountDetailsPath(accountId) : routePaths.account.users}
+      className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
+    >
+      <ArrowLeft className="size-4" aria-hidden="true" /> {scope === 'account' ? 'All users' : overview.data ? overview.data.account.name : 'Company'}
     </Link>
   );
   if (overview.error && !overview.data) {
@@ -94,7 +107,10 @@ export default function OperatorUserDetailsView() {
   if (!data) return <PageSkeleton />;
 
   const total = data.requests.accepted + data.requests.rejected;
-  const historyLink = (extra: string) => `${routePaths.operator.usage}?accountId=${encodeURIComponent(accountId)}&userId=${encodeURIComponent(userId)}&month=${month}${extra}`;
+  const historyLink = (extra: string) =>
+    scope === 'operator'
+      ? `${routePaths.operator.usage}?accountId=${encodeURIComponent(accountId)}&userId=${encodeURIComponent(userId)}&month=${month}${extra}`
+      : `${routePaths.account.usage}?userId=${encodeURIComponent(userId)}&month=${month}${extra}`;
 
   return (
     <>
@@ -104,12 +120,14 @@ export default function OperatorUserDetailsView() {
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {data.user.displayName && <span className="font-medium text-slate-700">{data.user.displayName}</span>}
-            <span>
-              User of{' '}
-              <Link to={buildAccountDetailsPath(accountId)} className="font-medium text-brand-700 hover:underline">
-                {data.account.name}
-              </Link>
-            </span>
+            {scope === 'operator' && (
+              <span>
+                User of{' '}
+                <Link to={buildAccountDetailsPath(accountId)} className="font-medium text-brand-700 hover:underline">
+                  {data.account.name}
+                </Link>
+              </span>
+            )}
             <Badge tone={data.plan.isPredefined ? 'neutral' : 'brand'}>{data.plan.isPredefined ? `${data.plan.name} (predefined)` : `${data.plan.name} (custom)`}</Badge>
             <span className="font-mono text-xs text-slate-400">
               {data.user.id} · registered {formatUtcDateTime(data.user.createdAt)}
@@ -120,12 +138,14 @@ export default function OperatorUserDetailsView() {
       />
       <p className="mb-6 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
         <Eye className="size-4 text-slate-400" aria-hidden="true" />
-        Read-only operator view. A request needs both this user&apos;s plan and the company&apos;s shared plan to allow it.
+        {scope === 'operator'
+          ? 'Read-only operator view. A request needs both this user’s plan and the company’s shared plan to allow it.'
+          : 'A request needs both this user’s plan and your shared account plan to allow it. Change the user’s plan on the Users page.'}
       </p>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <QuotaSnapshotCard quota={data.quota} title="User plan (individual)" highlight />
-        <QuotaSnapshotCard quota={data.accountQuota} title={`${data.account.name} (shared)`} />
+        <QuotaSnapshotCard quota={data.accountQuota} title={scope === 'operator' ? `${data.account.name} (shared)` : 'Your account plan (shared)'} />
         <Card>
           <CardHeader title="Statistics" description={formatMonthLabel(month)} />
           <CardBody className="space-y-4">
@@ -188,4 +208,12 @@ export default function OperatorUserDetailsView() {
       </Card>
     </>
   );
+}
+
+export function OperatorUserDetailsView() {
+  return <UserDetailsPage scope="operator" />;
+}
+
+export function AccountUserDetailsView() {
+  return <UserDetailsPage scope="account" />;
 }
