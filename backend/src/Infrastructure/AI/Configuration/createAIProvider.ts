@@ -9,6 +9,7 @@ export function createAIProvider(config: AppConfig, onUsage?: OpenAIProviderOpti
     return new OpenAIProvider({
       apiKey: config.OPENAI_API_KEY!,
       model: config.OPENAI_MODEL!,
+      baseURL: config.OPENAI_BASE_URL,
       timeoutMs: config.OPENAI_TIMEOUT_MS,
       maxOutputTokens: config.AI_MAX_OUTPUT_TOKENS,
       onUsage,

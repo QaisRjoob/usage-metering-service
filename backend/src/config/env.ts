@@ -32,6 +32,8 @@ const envSchema = z
     AI_PROVIDER: z.enum(['mock', 'openai']).default('mock'),
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_MODEL: z.string().optional(),
+    /** An OpenAI-compatible API instead of OpenAI (e.g. https://openrouter.ai/api/v1); empty = OpenAI. */
+    OPENAI_BASE_URL: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
     OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
     AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(100).max(4000).default(800),
     AI_RATE_LIMIT_PER_WINDOW: z.coerce.number().int().min(1).max(1000).default(10),

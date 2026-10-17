@@ -59,6 +59,12 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
+      # Optional OpenAI-compatible API (e.g. https://openrouter.ai/api/v1); empty = OpenAI itself.
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      # Per-attempt wait for the AI provider (the SDK retries once).
+      OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-20000}
+      # Output budget per answer (reasoning models need more, e.g. 3000).
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-800}
       # Trust X-Forwarded-For from the web container only (it overwrites the header), so rate limits
       # see the real client; direct callers of port 3000 cannot fake their address.
       TRUST_PROXY_ADDRESSES: 172.30.0.10

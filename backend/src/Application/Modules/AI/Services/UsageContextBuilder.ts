@@ -74,6 +74,8 @@ export function buildGlobalContext(summary: AdminAnalyticsSummary): BuiltContext
         utilizationPercent: account.quota.utilizationPercent,
         status: account.quota.status,
         users: account.userCount,
+        acceptedRequests: account.activity.acceptedRequests,
+        rejectedRequests: account.activity.rejectedRequests,
       })),
     },
     dataPoints: summary.monthly.length + summary.topAccounts.length + activeDays.length + 1,

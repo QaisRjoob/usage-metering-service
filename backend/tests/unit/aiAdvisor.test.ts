@@ -83,3 +83,52 @@ describe('providerErrorMessage', () => {
     expect(providerErrorMessage(new Error('boom'))).toMatch(/failed to answer/);
   });
 });
+
+describe('OpenAI-compatible APIs (e.g. OpenRouter)', () => {
+  it('calls Chat Completions on the configured base URL with the strict schema and parses the answer', async () => {
+    const { OpenAIProvider } = await import('../../src/Infrastructure/AI/Providers/OpenAIProvider');
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    const insight = { summary: 'All fine.', highlights: [{ title: 'ahmad', detail: '10 of 1000 units', severity: 'info' }], recommendations: ['Nothing to change.'] };
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init.body)) as Record<string, unknown> });
+      const reply = { id: 'c1', object: 'chat.completion', created: 0, model: 'm', choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: '```json\n' + JSON.stringify(insight) + '\n```' } }], usage: { prompt_tokens: 120, completion_tokens: 40, total_tokens: 160 } };
+      return new Response(JSON.stringify(reply), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    const usage: unknown[] = [];
+    const provider = new OpenAIProvider({ apiKey: 'test-key', model: 'vendor/model:free', baseURL: 'https://openrouter.example/api/v1', timeoutMs: 5_000, maxOutputTokens: 300, fetch: fakeFetch, onUsage: (metadata) => usage.push(metadata) });
+
+    const result = await provider.generateUsageInsight({
+      question: 'How is usage?',
+      scope: { kind: 'account', accountId: 'a1', accountName: 'شركة', period: '2026-10', dataPoints: 3 },
+      context: { users: [] },
+    });
+
+    expect(result).toEqual({ insight, provider: 'openai', model: 'vendor/model:free' });
+    expect(calls[0]!.url).toBe('https://openrouter.example/api/v1/chat/completions');
+    expect(calls[0]!.body).toMatchObject({ model: 'vendor/model:free', max_tokens: 300, response_format: { type: 'json_schema', json_schema: { name: 'usage_insight', strict: true } } });
+    expect(usage).toEqual([expect.objectContaining({ model: 'vendor/model:free', inputTokens: 120, outputTokens: 40 })]);
+  });
+
+  it('accepts OPENAI_BASE_URL in the configuration (empty = OpenAI itself)', async () => {
+    const { loadConfig } = await import('../../src/config/env');
+    const base = { DATABASE_URL: 'postgres://x', ADMIN_API_TOKEN: 'x'.repeat(20), JWT_SECRET: 'y'.repeat(40) };
+    expect(loadConfig({ ...base, OPENAI_BASE_URL: '' }).OPENAI_BASE_URL).toBeUndefined();
+    expect(loadConfig({ ...base, OPENAI_BASE_URL: 'https://openrouter.ai/api/v1' }).OPENAI_BASE_URL).toBe('https://openrouter.ai/api/v1');
+    expect(() => loadConfig({ ...base, OPENAI_BASE_URL: 'not a url' })).toThrow(/OPENAI_BASE_URL/);
+  });
+});
+
+describe('cut-off answers', () => {
+  it('says the answer was cut off when the model stops at the token limit', async () => {
+    const { OpenAIProvider } = await import('../../src/Infrastructure/AI/Providers/OpenAIProvider');
+    const fakeFetch = (async () =>
+      new Response(JSON.stringify({ id: 'c', object: 'chat.completion', created: 0, model: 'm', choices: [{ index: 0, finish_reason: 'length', message: { role: 'assistant', content: '{"summary": "half' } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as unknown as typeof fetch;
+    const provider = new OpenAIProvider({ apiKey: 'k', model: 'm', baseURL: 'https://compatible.example/v1', timeoutMs: 5_000, maxOutputTokens: 50, fetch: fakeFetch });
+    await expect(
+      provider.generateUsageInsight({ question: 'q', scope: { kind: 'global', accountId: null, accountName: null, period: '2026-10', dataPoints: 0 }, context: {} }),
+    ).rejects.toMatchObject({ code: 'AI_PROVIDER_ERROR', message: expect.stringContaining('AI_MAX_OUTPUT_TOKENS') });
+  });
+});

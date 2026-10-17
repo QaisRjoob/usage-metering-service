@@ -516,21 +516,34 @@ average) and the provider only explains them, returning a validated JSON structu
 
 | Variable | Default | |
 |---|---|---|
-| `AI_PROVIDER` | `mock` | `mock` (deterministic, labelled as mock) or `openai` |
+| `AI_PROVIDER` | `mock` | `mock` (deterministic, labelled as mock) or `openai` (OpenAI or any OpenAI-compatible API) |
 | `OPENAI_API_KEY` | – | required for `openai`; server-side only, never sent to the browser |
 | `OPENAI_MODEL` | – | required for `openai`; verified with the API at startup (warning if unknown) |
-| `OPENAI_TIMEOUT_MS` / `AI_MAX_OUTPUT_TOKENS` | 20000 / 800 | |
+| `OPENAI_BASE_URL` | – (OpenAI) | an OpenAI-compatible API instead, e.g. `https://openrouter.ai/api/v1`; called through Chat Completions with the same strict JSON schema |
+| `OPENAI_TIMEOUT_MS` / `AI_MAX_OUTPUT_TOKENS` | 20000 / 800 | per attempt (the SDK retries once) / output budget; reasoning models need more (e.g. 3000), a cut-off answer is reported as such |
 | `AI_RATE_LIMIT_PER_WINDOW` / `AI_RATE_LIMIT_WINDOW_MS` | 10 / 60000 | per credential |
 
 With an API key the advisor sees only that account; with the operator token it sees cross-account
 aggregates. The model cannot query the database or change anything. Prompts keep system
 instructions separate from the question and data, treat names as untrusted data, and cap their size;
-questions are not logged. The OpenAI provider uses the official SDK (Responses API, strict JSON
-schema). It was implemented against the SDK but **not exercised against the live OpenAI API** in this
-environment (no key available); tests use the mock and a failing test double.
+questions are not logged. The provider uses the official OpenAI SDK with a strict JSON schema: the
+Responses API for OpenAI, Chat Completions for compatible APIs. It was **verified live through
+OpenRouter** (`nvidia/nemotron-3-super-120b-a12b:free`, a free reasoning model): it ranked companies by
+rejections from the real data and answered Arabic questions in Arabic, in 15–25 s. Provider errors
+are reported by kind (no credit, rate limit, rejected key, cut-off answer) without forwarding details.
 
-To try OpenAI with Compose: create `.env` next to `docker-compose.yml` with `AI_PROVIDER=openai`,
-`OPENAI_API_KEY=...`, `OPENAI_MODEL=<a model your key can use>`.
+To use it with Compose, create `.env` next to `docker-compose.yml` (ignored by Git):
+
+```
+AI_PROVIDER=openai
+OPENAI_BASE_URL=https://openrouter.ai/api/v1      # omit for OpenAI itself
+OPENAI_API_KEY=sk-or-...                           # never commit it
+OPENAI_MODEL=nvidia/nemotron-3-super-120b-a12b:free  # or openai/gpt-4o-mini with credit
+OPENAI_TIMEOUT_MS=40000
+AI_MAX_OUTPUT_TOKENS=3000
+```
+
+then `docker compose up -d`.
 
 ## 16. Local development without Docker
 
@@ -565,7 +578,7 @@ npm run dev:api-mode          # http://localhost:5174 against the real API on :3
   the test laptop); many accounts scale independently. Sharded counters would be the next step.
 - History totals use `count(*)`; for very large single-account months this costs ~90 ms (cursor
   pagination would avoid it).
-- The OpenAI provider was not run against the live API here (no credentials).
+- The AI advisor was verified live through OpenRouter (free model), not against OpenAI itself (that key had no credit); free models are slower (15–25 s) and rate-limited by OpenRouter.
 - `npm audit` reports advisories only in dev tooling (vitest's `tinypool`); not part of any image.
 
 ---

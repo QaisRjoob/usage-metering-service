@@ -29,7 +29,8 @@ server {
     proxy_hide_header X-Content-Type-Options;
     proxy_hide_header Referrer-Policy;
     proxy_hide_header Cross-Origin-Opener-Policy;
-    proxy_read_timeout 60s;
+    # Long enough for a slow AI advisor answer (provider timeout, one retry).
+    proxy_read_timeout 120s;
   }
 
   # Hashed build assets can be cached for a long time (expires sets Cache-Control without add_header).

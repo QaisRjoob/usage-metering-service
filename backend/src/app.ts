@@ -42,7 +42,10 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
           },
     genReqId: generateRequestId,
     bodyLimit: 64 * 1024,
-    connectionTimeout: 15_000,
+    // Idle-socket limit. It must outlast the slowest handler: the AI advisor waits for the provider
+    // (OPENAI_TIMEOUT_MS, retried once by the SDK), during which the socket sends nothing.
+    connectionTimeout: Math.max(15_000, 2 * config.OPENAI_TIMEOUT_MS + 10_000),
+    // Time allowed to receive the whole request (headers and body), not to answer it.
     requestTimeout: 30_000,
     // Never "true": then any client could set X-Forwarded-For and pick its own IP. Either the exact
     // proxy addresses (the web container) or a hop count; by default no proxy is trusted.
