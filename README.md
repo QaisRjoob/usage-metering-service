@@ -1,213 +1,323 @@
+<div align="center">
+
 # Usage Metering & Quota Service
 
-A service that other applications call to **track usage and decide whether their users may perform
-an action**. Every request is checked against two plans at once: the calling application's
-**account plan** (a shared allowance) and the acting **user's plan** (an individual allowance). The
-service records every decision, explains rejections (which rule, account or user level), keeps
-history for any month, and stays correct under retries and concurrent requests.
+**Two-level usage metering and quota enforcement for multi-tenant applications**
 
-It ships with an operator dashboard and an example client (the **Client Demo** page, plus a CLI).
+Other applications call this service before a user performs a metered action. It checks the request
+against the application's shared **account plan** and the acting **user's plan**, records the decision,
+explains rejections, and stays correct under retries and concurrent traffic.
 
-> **New here?** [docs/USER_GUIDE.md](docs/USER_GUIDE.md) explains the app in plain words and walks
-> through every page of the web interface step by step.
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22-5FA04E?logo=nodedotjs&logoColor=white)
+![Fastify](https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
 
-- **Two independent parts:** [`backend/`](backend) (Fastify + PostgreSQL API) and [`frontend/`](frontend)
-  (React + Vite dashboard and Client Demo). Each has its own `package.json`, lockfile, Dockerfile and
-  tests; the root only holds `docker-compose.yml` and the docs.
-- **Architecture:** modular monolith, Clean Architecture layers, CQRS-lite, repositories, constructor DI.
-- **One metered resource:** units (for example document-processing credits).
+[Quick start](#-quick-start) ·
+[Architecture](#-architecture) ·
+[API](#-api) ·
+[Quota rules](#-quota-rules) ·
+[UML diagrams](#-uml-diagrams) ·
+[User guide](docs/USER_GUIDE.md)
 
----
-
-## Contents
-
-1. [Quick start (Docker Compose)](#1-quick-start-docker-compose)
-2. [Using the example client](#2-using-the-example-client)
-3. [Account and user model](#3-account-and-user-model)
-4. [API keys and the operator token](#4-api-keys-and-the-operator-token)
-5. [API reference and curl walkthrough](#5-api-reference-and-curl-walkthrough)
-6. [Supported rules and evaluation order](#6-supported-rules-and-evaluation-order)
-7. [Predefined plans](#7-predefined-plans)
-8. [Plan changes](#8-plan-changes)
-9. [Retry behaviour and idempotency](#9-retry-behaviour-and-idempotency)
-10. [Concurrency strategy](#10-concurrency-strategy)
-11. [Product assumptions](#11-product-assumptions)
-12. [Design decisions and trade-offs](#12-design-decisions-and-trade-offs)
-13. [Testing](#13-testing)
-14. [Performance](#14-performance)
-15. [AI Usage Advisor](#15-ai-usage-advisor)
-16. [Local development without Docker](#16-local-development-without-docker)
-17. [Known limitations](#17-known-limitations)
-18. [UML diagrams](#18-uml-diagrams)
+</div>
 
 ---
 
-## 1. Quick start (Docker Compose)
+## Table of contents
 
-Requirements: Docker with Compose v2. No OpenAI key is needed.
+1. [Overview](#-overview)
+2. [Features](#-features)
+3. [Tech stack](#-tech-stack)
+4. [Quick start](#-quick-start)
+5. [Using the application](#-using-the-application)
+6. [Architecture](#-architecture)
+7. [Domain model](#-domain-model)
+8. [Authentication and security](#-authentication-and-security)
+9. [API](#-api)
+10. [Quota rules](#-quota-rules)
+11. [Plans and plan changes](#-plans-and-plan-changes)
+12. [Idempotency and retries](#-idempotency-and-retries)
+13. [Concurrency](#-concurrency)
+14. [AI Usage Advisor](#-ai-usage-advisor)
+15. [Testing](#-testing)
+16. [Performance](#-performance)
+17. [Local development](#-local-development)
+18. [Product assumptions](#-product-assumptions)
+19. [Design decisions and trade-offs](#-design-decisions-and-trade-offs)
+20. [Known limitations](#-known-limitations)
+21. [UML diagrams](#-uml-diagrams)
+22. [Documentation](#-documentation)
+
+---
+
+## 📌 Overview
+
+| Concept | Meaning |
+|---|---|
+| **Account** | A calling application (a company). It has one API key and an **account plan** whose limits are shared by all its users. |
+| **User** | A user of that application, identified by the application's own `externalUserId`. Its **user plan** sets individual limits. |
+| **Plan** | Named rules (monthly allowance + maximum units per request) with a scope: `account` or `user`. Predefined (read-only) or custom (owned by one account). |
+| **Units** | Positive whole numbers consumed by an action, for example document-processing credits. |
+
+Every request is evaluated against **both** plans. An account's usage is the sum of the accepted usage of
+its users, so giving one user a bigger plan never enlarges the shared pool. A rejected request consumes
+nothing.
+
+The repository has two independent parts, each with its own `package.json`, lockfile, Dockerfile and
+tests:
+
+- [`backend/`](backend): the API (Fastify + PostgreSQL)
+- [`frontend/`](frontend): the web app (React + Vite): operator console, company portal, Client Demo
+
+---
+
+## ✨ Features
+
+**Metering core**
+- Two-level quota decision (user plan **and** account plan) inside one PostgreSQL transaction
+- Clear rejections: which rule (`MONTHLY_ALLOWANCE`, `MAX_UNITS_PER_REQUEST`) and which level (`user`, `account`)
+- Idempotent retries through a client `requestId`; accepted and rejected decisions are replayed
+- Correct under concurrency: row locks in a fixed order, verified with up to 150 simultaneous requests
+- Versioned plans: changes take effect immediately, and history keeps the exact versions that decided each request
+- Monthly (UTC) counters, with full history for any month
+
+**Web application**
+- **Operator console** (`/admin`): dashboard, access requests, companies with category tabs and search, company and user drill-down, company statistics, a directory of all users, plan catalogue, cross-account history, and a header finder
+- **Company portal** (`/app`): overview, users, plans, quotas, usage history, user statistics, Client Demo
+- **Self-service sign-up**: a company applies, the operator approves or denies, and the company collects its API key exactly once
+- Light and dark theme, URL-driven filters, sorting and pagination
+- Arabic sample data
+
+**Security**
+- JWT access tokens (15 min) with rotating refresh tokens in an `HttpOnly` cookie and reuse detection
+- Role-separated interfaces and endpoints (`operator` / `account`); other tenants' data answers `404`
+- API keys and refresh tokens stored only as SHA-256 hashes
+- Rate limits, CSP and security headers, loopback-only ports
+
+**Extras**
+- AI Usage Advisor (mock, or OpenAI / any OpenAI-compatible API such as OpenRouter)
+- OpenAPI document with Swagger UI
+- CLI example client and a demo data generator
+
+---
+
+## 🧰 Tech stack
+
+| Layer | Technologies |
+|---|---|
+| Backend | Node.js 22, TypeScript 5.9, Fastify 5, `pg` (plain SQL), zod 4, `jose` (JWT), OpenAI SDK |
+| Database | PostgreSQL 17 (SQL migrations, constraints, composite foreign keys) |
+| Frontend | React 19, Vite 7, React Router 7, TanStack Query 5, Tailwind CSS 4, Recharts |
+| Testing | Vitest, Testing Library, integration tests against a real PostgreSQL |
+| Delivery | Docker Compose (nginx, API, PostgreSQL) |
+| Documentation | OpenAPI / Swagger UI, PlantUML |
+
+---
+
+## 🚀 Quick start
+
+**Requirements:** Docker with Compose v2. No AI key is needed (the advisor falls back to a mock).
 
 ```bash
+git clone https://github.com/QaisRjoob/usage-metering-service.git
+cd usage-metering-service
 docker compose up --build
 ```
 
 | What | URL |
 |---|---|
-| Web dashboard + Client Demo | http://localhost:8080 |
+| Web app (operator console, company portal, Client Demo) | http://localhost:8080 |
 | API | http://localhost:3000/api/v1 |
-| API docs (Swagger UI) / OpenAPI JSON | http://localhost:3000/docs · http://localhost:3000/api/v1/openapi.json |
-| PostgreSQL (for inspection) | `localhost:5433`, user/password/db `metering` |
+| Swagger UI / OpenAPI JSON | http://localhost:3000/docs · http://localhost:3000/api/v1/openapi.json |
+| PostgreSQL (inspection) | `localhost:5433`, user / password / database `metering` |
 
-The web app calls the API on its own address (`http://localhost:8080/api/v1`): nginx forwards
-`/api/*` to the API container, so there are no cross-origin requests and the app works the same
-whether you open it as `localhost`, `127.0.0.1` or `[::1]`. Port 3000 stays open for API clients,
-curl and the Swagger UI. The containers restart automatically after Docker Desktop restarts.
+Startup is automatic: PostgreSQL becomes healthy, then the API applies the migrations and seeds the
+predefined plans and demo data (all idempotent), then the web app starts once the API is ready.
 
-Startup is automatic: PostgreSQL becomes healthy → the API applies SQL migrations, seeds the
-predefined plans and the demo data (all idempotent) → the web app starts once the API is ready.
+### Demo credentials (local use only)
 
-**Local demo credentials** (public, for local use only):
-
-| Credential | Value | Used for |
+| Credential | Value | Opens |
 |---|---|---|
-| Operator token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`); exchanged for a JWT at sign-in | the **operator console** (`/admin`) |
-| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | the **account portal** (`/app`) of "شركة الوثائق التجريبية" |
+| Operator token | `local-admin-token-change-me` (set `ADMIN_API_TOKEN` to change it) | Operator console `/admin` |
+| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | Company portal `/app` of "شركة الوثائق التجريبية" |
 
-The web app opens on a **login page with one field**: paste any token and press *Sign in*. The server
-identifies it (`POST /api/v1/auth/token`, which returns a JWT): the operator token opens the operator console, an account
-API key opens that account's portal — nobody picks a role by hand. Each role
-gets its own interface (own layout, menu and URL space); the other role's pages are unreachable:
+The login page has a single field: paste a credential and the server identifies it, so nobody picks a
+role by hand. To start again from a clean state:
+
+```bash
+docker compose down -v
+```
+
+Then run `docker compose up --build` again.
+
+> The web app calls the API on its own origin (`/api/*` is proxied by nginx), so it works the same
+> on `localhost`, `127.0.0.1` and `[::1]`. Ports are published on the loopback interface only, and
+> containers restart automatically with Docker Desktop.
+
+---
+
+## 🖥️ Using the application
+
+A click-by-click tour of every page is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 
 | Interface | URL | Pages |
 |---|---|---|
-| Public | `/login`, `/signup`, `/signup/status` | Sign in; request access (company sign-up); follow a request and collect the API key once approved |
-| Operator console | `/admin` | Overview (dashboard), Access requests (approve or deny sign-ups; a badge counts the waiting ones), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only company statistics: requests, rejection rate, daily chart, 6-month trend, users you can open), user details (one user's quotas, statistics, trends and request history), Company statistics (every company's usage, share, requests, rejection rate and active users, with totals), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
-| Account portal | `/app` | Overview, Users (category tabs with counts, activity columns, filters), user details (one user's quotas, statistics, trends and request history), Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
+| Public | `/login`, `/signup`, `/signup/status` | Sign in; request access; follow a request and collect the API key |
+| Operator console | `/admin` | Overview, Access requests, Accounts (tabs, search, company and user drill-down), Company statistics, Users directory, Plan catalogue, Usage history, AI Advisor |
+| Company portal | `/app` | Overview, Users (and user details), Plans, Quotas, Usage history, Client Demo, AI Advisor |
 
-Only one role is signed in at a time (signing in as one signs you out of the other), and the API
-enforces the same split independently: the admin token does not open account endpoints and an API
-key does not open `/admin`. Credentials stay in the browser tab only (sessionStorage).
+Only one role is signed in at a time, and the API enforces the same split on its own.
 
-**Light / dark theme:** the moon / sun button (top right on every page) switches the theme; the
-choice is remembered in the browser (localStorage) and the system preference is used until then.
+### Client Demo (http://localhost:8080/app/demo)
 
-**Self-service sign-up:** a company fills in `/signup` (company, contact, email, plan, use case)
-and receives a **request id** and a **claim code** (shown once, stored only as a SHA-256 hash). The
-operator approves (the account is created in the same transaction) or denies with a reason on
-**Access requests**. The company follows its request on `/signup/status` and, once approved,
-collects its API key there exactly once (the key is issued at claim time; only its hash is stored).
-No email is sent; the claim code is the applicant's proof. One open request per email; submitting is
-rate-limited per IP (`SIGNUP_RATE_LIMIT_PER_MINUTE`, default 10).
+A simulated **document processor**, an external application that knows nothing about plans. Before
+"processing" a document it calls `POST /usage/consume` with a fresh `requestId` and shows the decision.
 
-Start again from a clean state with `docker compose down -v && docker compose up --build`.
-
-**Verified on 2026-10-15** (Docker Desktop 29.8.2, Compose v5.6, Windows 11 + WSL 2): from a clean
-state the images built (web 75 MB, API 333 MB), startup ran postgres → API (migration applied, seed
-done) → web with all three containers healthy, and the full Client Demo scenario above passed in the
-browser at :8080. After `docker compose down` and `docker compose up` (volume kept), usage totals,
-plan assignments, history and idempotent replay of an earlier `requestId` were all preserved, and the
-migration check applied nothing new.
-
-## 2. Using the example client
-
-A click-by-click tour of all pages is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
-
-The database design (tables, normal form, constraints, indexes) is in [docs/DATABASE.md](docs/DATABASE.md);
-permissions, page separation and security controls are in [docs/SECURITY.md](docs/SECURITY.md).
-
-### Client Demo page (http://localhost:8080/app/demo)
-
-A simulated **document processor** — an external application — that calls the service with the demo
-account's API key. It knows nothing about plans; before "processing" a document it calls
-`POST /usage/consume` with a fresh `requestId`, then shows the decision and both remaining
-allowances.
-
-Seeded demo account **شركة الوثائق التجريبية**: custom account plan **الرصيد المشترك التجريبي** (100 units/month,
-100 per request); users `ahmad` (أحمد الخطيب, Basic: 1,000/month, 20/request), `sara` (سارة النجار,
-Premium: 10,000/month, 200/request), `omar` (عمر حداد, Basic). Company and person names in the sample
-data are Arabic; user ids stay in Latin letters because client applications send them in URLs.
-
-**More sample data:** with the stack running, `npm run demo:populate` (in `backend/`) adds three
-more companies with users, a custom plan, accepted and rejected requests, and two sign-up requests,
-all with Arabic names. Run it once on a fresh database.
-
-Run the guided steps in order (each has a **Run** button):
+Seeded data: account **شركة الوثائق التجريبية** on the custom plan **الرصيد المشترك التجريبي**
+(100 units/month, 100 per request), with users `ahmad` (أحمد الخطيب, Basic), `sara` (سارة النجار, Premium)
+and `omar` (عمر حداد, Basic).
 
 | Step | Request | Result |
 |---|---|---|
 | 1 | ahmad, 10 units | **Accepted**: +10 for ahmad and +10 for the account |
-| 2 | ahmad, 25 units | **Rejected** by `MAX_UNITS_PER_REQUEST`, **user** level (Basic allows 20) |
-| 3 | sara, 95 units | **Rejected** by `MONTHLY_ALLOWANCE`, **account** level (90 shared units left; sara has 10,000) |
-| 4 | Switch ahmad to Premium (or raise the shared pool) in the plan panel, then repeat step 2 or 3 | Now **accepted** — same client code, different outcome |
-| 5 | "Retry same request" | Same `requestId` → the stored decision is **replayed**, nothing is consumed twice |
+| 2 | ahmad, 25 units | **Rejected**: `MAX_UNITS_PER_REQUEST`, **user** level (Basic allows 20) |
+| 3 | sara, 95 units | **Rejected**: `MONTHLY_ALLOWANCE`, **account** level (90 shared units left) |
+| 4 | Switch ahmad to Premium or raise the pool, then repeat step 2 or 3 | **Accepted**: same client code, different outcome |
+| 5 | "Retry same request" | Same `requestId`: the stored decision is **replayed**, nothing consumed twice |
 
-The plan panel on the same page uses the account's own configuration endpoints, standing in for
-"another tab" of the account's admin tools; the client panel never changes.
-
-### CLI client
+### CLI client and sample data
 
 ```bash
 cd backend
 npm install
-npm run demo:cli                       # the same scenario from the terminal
-npm run demo:cli -- process ahmad 10   # a single request
+npm run demo:cli
 ```
 
-`API_URL` (default `http://localhost:3000/api/v1`) and `API_KEY` (default the demo key) are
-configurable. Run the scenario on a fresh demo account (it expects the 100-unit pool to be unused).
+`npm run demo:cli -- process ahmad 10` sends a single request (`API_URL` and `API_KEY` are configurable).
+With the stack running, `npm run demo:populate` adds three more Arabic-named companies with users, custom
+plans, accepted and rejected requests, and sign-up requests (run it once, on a fresh database).
 
-## 3. Account and user model
+---
 
-| Concept | Meaning |
-|---|---|
-| **Account** | A calling application. One API key. Its **account plan** defines limits shared by all its users. |
-| **User** | A user of that application, registered under one account, identified by the application's own `externalUserId`. Its **user plan** defines individual limits. |
-| **Plan** | Named rules (monthly allowance + max units per request) with a **scope**: `account` or `user`. Predefined (seeded, read-only) or custom (owned by one account). |
-| **Units** | Positive whole numbers consumed by an action. |
+## 🏗️ Architecture
 
-Both plans apply to every request. The account's usage is the **sum of accepted usage across its
-users**. Giving a user a larger plan does **not** increase the account's shared allowance. Users who
-share a plan definition keep separate totals.
+A **modular monolith** following Clean Architecture with CQRS-lite (commands for writes, queries for
+reads), repositories and constructor injection. `container.ts` is the only place that knows the
+concrete classes.
 
-## 4. Authentication: JWT, API keys and the operator token
+<p align="center">
+  <img src="docs/uml/svg/07-component-architecture.svg" alt="Component diagram" width="100%">
+</p>
 
-**Signing in issues a JWT.** `POST /api/v1/auth/token` takes a credential (an account API key or the
-operator token) and returns a short-lived **JWT access token**; the server also sets a **refresh
-token** as an `HttpOnly` cookie. Every other request sends `Authorization: Bearer <access token>`.
+```text
+docker-compose.yml   full stack: postgres + api + web
+docs/                API contract, database, security, user guide, UML diagrams
+backend/
+  src/
+    Domain/          pure business rules: QuotaPolicy (two-level evaluation), periods, plan rules
+    Application/     use cases (Commands / Queries), ports (repository interfaces), DTO mapping
+    Infrastructure/  PostgreSQL (pool, migrations, seed, transactions, repositories), JWT, AI providers
+    Presentation/    Fastify routes, error envelope, OpenAPI
+    Shared/          AppError, auth guards, rate limiting, validation
+    contracts/       DTOs and zod schemas: the API contract
+    container.ts     composition root
+  tests/             unit, integration, concurrency, performance
+  scripts/           CLI client and demo data
+frontend/
+  src/               models, services (HTTP + mock), view models (hooks), views, widgets
+    contracts/       identical copy of backend/src/contracts
+```
+
+Tracing a consume request: `usage.routes.ts` → `ConsumeUnitsCommand` → `QuotaPolicy.evaluateRequest`
+→ `PostgresQuotaRepository` / `PostgresUsageRepository`, all inside `PostgresTransactionManager.run`.
+
+### Deployment
+
+<p align="center">
+  <img src="docs/uml/svg/08-deployment.svg" alt="Deployment diagram" width="85%">
+</p>
+
+---
+
+## 🧩 Domain model
+
+<p align="center">
+  <img src="docs/uml/svg/06-class-domain.svg" alt="Class diagram" width="90%">
+</p>
+
+The schema (migrations 001 to 005) keeps `plans` with immutable `plan_versions`, `accounts`, `users`,
+monthly counters per account and per user, and `usage_records` (every decision, which is also the
+idempotency record). Check constraints, composite foreign keys (plan scope, user/account consistency)
+and indexes for the history pages are described in [docs/DATABASE.md](docs/DATABASE.md).
+
+<details>
+<summary><b>ER diagram</b></summary>
+<p align="center">
+  <img src="docs/uml/svg/09-er-database.svg" alt="ER diagram" width="100%">
+</p>
+</details>
+
+---
+
+## 🔐 Authentication and security
+
+Signing in exchanges a credential (an account API key or the operator token) for a **JWT**:
+`POST /api/v1/auth/token` returns a short-lived access token and sets a refresh token cookie. Every
+other browser request sends `Authorization: Bearer <access token>`.
 
 | Token | What it is | Lifetime | Where it lives |
 |---|---|---|---|
-| Access token | JWT, HS256, claims `iss`, `aud`, `sub` (account id or `operator`), `role`, `iat`, `exp`, `jti` | 15 min (`ACCESS_TOKEN_TTL_SECONDS`) | browser memory only |
-| Refresh token | opaque random value (`umr_…`), stored only as a SHA-256 hash | 7 days (`REFRESH_TOKEN_TTL_DAYS`) | `HttpOnly`, `SameSite=Strict` cookie, path `/api/v1/auth` |
+| Access token | JWT (HS256): `iss`, `aud`, `sub`, `role`, `iat`, `exp`, `jti` | 15 min (`ACCESS_TOKEN_TTL_SECONDS`) | Browser memory only |
+| Refresh token | Opaque random value (`umr_…`), stored as a SHA-256 hash | 7 days (`REFRESH_TOKEN_TTL_DAYS`) | `HttpOnly`, `SameSite=Strict` cookie, path `/api/v1/auth` |
 
-- `POST /auth/refresh` rotates: the refresh token is used up and a new pair is issued. Presenting
-  an already-used refresh token again (a copied/stolen one) **revokes the whole session**.
-  `POST /auth/logout` revokes the session. Both need the header `X-Requested-With: umk-web` (CSRF guard).
-- The verifier pins `HS256`, the issuer and the audience, so `alg: none` or tokens signed with
-  another key are rejected (`401 TOKEN_INVALID`); an expired token answers `401 TOKEN_EXPIRED`
-  and the web app refreshes it silently.
-- **Roles decide the interface**: operator endpoints (`/admin/*`) accept only an operator token;
-  account endpoints only an account token (the wrong role answers `403 INSUFFICIENT_ROLE`).
+- **Rotation and reuse detection:** `POST /auth/refresh` uses up the refresh token and issues a new pair.
+  Presenting a used token again revokes the whole session family. `POST /auth/logout` revokes the session.
+  Both require `X-Requested-With: umk-web` (CSRF guard).
+- **Silent refresh:** the web app refreshes 30 seconds before expiry, retries once on `TOKEN_EXPIRED`,
+  and restores the session after a page reload from the cookie.
+- **Strict verification:** the algorithm, issuer and audience are pinned, so `alg: none` or foreign keys
+  give `401 TOKEN_INVALID`.
+- **Roles:** `/admin/*` accepts only operator tokens and account endpoints only account tokens
+  (`403 INSUFFICIENT_ROLE`). Another tenant's resources answer `404`, never `403`.
+- **API keys** (`umk_live_` + 32 random bytes) are shown once; only a hash and a display prefix are
+  stored. Server-to-server clients may send the key directly as `X-API-Key` on account endpoints.
+- **Operator token** (`ADMIN_API_TOKEN`) is accepted only by `POST /auth/token`.
+- Rate limits on sign-in failures, sign-up and the AI endpoint; Helmet and CSP headers; trusted proxy limited to the web container.
 
-**Account API key** — `umk_live_` + 32 random bytes, issued once by `POST /admin/accounts` (or
-collected once after a sign-up approval). Only a SHA-256 hash and a 13-character display prefix are
-stored. Besides signing in, **server-to-server clients may send it directly** as `X-API-Key` on
-account endpoints, as the brief requires (the CLI client does). The key alone identifies the
-account; resources of another account answer **404**, never 403.
+<p align="center">
+  <img src="docs/uml/svg/03-sequence-jwt-auth.svg" alt="JWT sequence diagram" width="90%">
+</p>
 
-**Operator token** (`ADMIN_API_TOKEN`) — the operator's credential, accepted **only** at
-`POST /auth/token` and exchanged there for an operator JWT; `/admin/*` itself never accepts it.
+The full permission matrix and controls are in [docs/SECURITY.md](docs/SECURITY.md).
 
-## 5. API reference and curl walkthrough
+### Self-service sign-up
 
-The full contract is in [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md) and the live OpenAPI document
-at `/api/v1/openapi.json` (Swagger UI: `/docs`). The contract types and request schemas live in
-[`backend/src/contracts`](backend/src/contracts), with an identical copy in
-[`frontend/src/contracts`](frontend/src/contracts) (see §12).
+A company fills in `/signup` and receives a **request id** and a **claim code** (shown once, stored as a
+hash). The operator approves (the account is created in the same transaction) or denies with a reason.
+The company follows the request on `/signup/status` and collects its API key exactly once. There is one
+open request per email, and submissions are rate-limited per IP (`SIGNUP_RATE_LIMIT_PER_MINUTE`).
+
+<p align="center">
+  <img src="docs/uml/svg/04-sequence-signup.svg" alt="Sign-up sequence diagram" width="90%">
+</p>
+
+---
+
+## 📡 API
+
+The full contract is in [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md), and the live OpenAPI document is
+at `/api/v1/openapi.json` (Swagger UI at `/docs`).
 
 | Area | Endpoints (prefix `/api/v1`) |
 |---|---|
-| Health | `GET /health`, `GET /ready` (checks PostgreSQL) |
-| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/facets`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/accounts/:id/usage-summary`, `GET /admin/accounts/:id/users/:userId`, `GET /admin/analytics/companies`, `GET /admin/users`, `GET /admin/users/facets`, `GET /admin/search`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/analytics/summary` |
+| Health | `GET /health`, `GET /ready` |
+| Auth | `POST /auth/token`, `POST /auth/refresh`, `POST /auth/logout` |
+| Sign-up | `POST /signup-requests`, `POST /signup-requests/status`, `POST /signup-requests/claim` |
+| Operator | `POST/GET /admin/accounts`, `GET /admin/accounts/facets`, `GET /admin/accounts/:id`, `GET /admin/accounts/:id/users`, `GET /admin/accounts/:id/usage-summary`, `GET /admin/accounts/:id/users/:userId`, `GET /admin/analytics/companies`, `GET /admin/analytics/summary`, `GET /admin/users`, `GET /admin/users/facets`, `GET /admin/search`, `GET /admin/plans`, `GET /admin/usage`, `GET /admin/signup-requests`, `POST /admin/signup-requests/:requestId/approve`, `POST /admin/signup-requests/:requestId/reject` |
 | Account | `GET /account`, `PUT /account/plan`, `GET /account/usage-summary?month=YYYY-MM` |
 | Users | `GET/POST /users`, `GET /users/:userId`, `PUT /users/:userId/plan`, `GET /users/:userId/usage-summary` |
 | Plans | `GET/POST /plans`, `GET/PATCH /plans/:planId` |
@@ -215,80 +325,71 @@ at `/api/v1/openapi.json` (Swagger UI: `/docs`). The contract types and request 
 | Usage | `POST /usage/consume`, `GET /usage`, `GET /usage/:usageId` |
 | AI | `POST /ai/advisor` |
 
-Errors always look like `{"error": {"code", "message", "requestId", "details?"}}`. Lists are
-paginated: `?page=1&pageSize=20` (max 100) →
-`{items, page, pageSize, totalItems, totalPages, hasNextPage, hasPreviousPage}`.
+**Conventions**
+- **Errors:** `{"error": {"code", "message", "requestId", "details?"}}`.
+- **Pagination:** `?page=1&pageSize=20` (max 100) returns `{items, page, pageSize, totalItems, totalPages, hasNextPage, hasPreviousPage}`.
+- **List queries:** every list validates its query string with a zod DTO shared with the frontend. Filters
+  run in SQL, sort keys come from a whitelist with a unique tie-breaker, and ranges are checked.
 
-### Filtering and sorting (query DTOs)
-
-Every list takes a **query DTO**: a zod schema in [`backend/src/contracts`](backend/src/contracts)
-that validates and types the query string (`page`, `pageSize`, filters, `sort`, `order`). Filters
-are applied in SQL, sort keys come from a whitelist (never raw SQL), every ordering has a unique
-tie-breaker, and ranges are checked (`max ≥ min`, `to ≥ from`). Invalid input → `400 VALIDATION_ERROR`
-naming the field. The web app validates with the **same schema** before requesting, so mistakes show
-next to the field.
+<details>
+<summary><b>Filters and sort keys per list</b></summary>
 
 | List | Filters | Sort keys |
 |---|---|---|
-| `GET /admin/accounts` | `search` (name, account id, API key prefix, or a user's id / display name), `status`, `activity` (active/inactive this month), `hasRejections`, `planId`, `planKind` (predefined/custom), `minUsers`/`maxUsers`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `name`, `createdAt`, `utilization`, `consumed`, `userCount`, `lastActivity`, `rejected` |
-| `GET /admin/users` (every company) | `search` (user id, display name, internal id), `accountId`, `planId`, `status`, `activity`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `externalUserId`, `accountName`, `createdAt`, `utilization`, `consumed`, `lastActivity` (default), `rejected` |
-| `GET /users`, `GET /admin/accounts/:id/users`, `GET /quotas` | `search`, `status`, `planId`, `activity` (active/inactive this month), `hasRejections`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo` (registration), `month` (not on quotas) | `externalUserId`, `createdAt`, `utilization`, `consumed`, `lastActivity`, `rejected` |
-| `GET /usage`, `GET /admin/usage` | `userId`, `outcome`, `rule`, `level`, `minUnits`/`maxUnits`, `requestId` (contains), `replayed`, `month`, `from`/`to`; admin adds `accountId` | `createdAt`, `units` |
-| `GET /plans`, `GET /admin/plans` | `search`, `scope`, `kind`; admin adds `ownerAccountId` | `name`, `createdAt`, `monthlyAllowance`, `maxUnitsPerRequest` |
+| `GET /admin/accounts` | `search` (name, id, key prefix, user id / name), `status`, `activity`, `hasRejections`, `planId`, `planKind`, `minUsers`/`maxUsers`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `name`, `createdAt`, `utilization`, `consumed`, `userCount`, `lastActivity`, `rejected` |
+| `GET /admin/users` | `search`, `accountId`, `planId`, `status`, `activity`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `externalUserId`, `accountName`, `createdAt`, `utilization`, `consumed`, `lastActivity`, `rejected` |
+| `GET /users`, `GET /admin/accounts/:id/users`, `GET /quotas` | `search`, `status`, `planId`, `activity`, `hasRejections`, `minUtilization`/`maxUtilization`, `createdFrom`/`createdTo`, `month` | `externalUserId`, `createdAt`, `utilization`, `consumed`, `lastActivity`, `rejected` |
+| `GET /usage`, `GET /admin/usage` | `userId`, `outcome`, `rule`, `level`, `minUnits`/`maxUnits`, `requestId`, `replayed`, `month`, `from`/`to` (admin adds `accountId`) | `createdAt`, `units` |
+| `GET /plans`, `GET /admin/plans` | `search`, `scope`, `kind` (admin adds `ownerAccountId`) | `name`, `createdAt`, `monthlyAllowance`, `maxUnitsPerRequest` |
 
-Example: the 20 largest rejections caused by a user limit this month, for one account:
-`GET /api/v1/admin/usage?accountId=…&level=user&month=2026-10&sort=units&order=desc&pageSize=20`.
+</details>
 
-Category counts for the tabs come from `GET /admin/accounts/facets` and `GET /admin/users/facets`
-(per status, plan and activity, within the current search), and the operator header finder uses
-`GET /admin/search?q=` (up to 6 companies and 6 users, exact id / key-prefix matches first).
-Sorting by `lastActivity` puts rows without any request last in both directions.
-
-### Main flow with curl
+<details>
+<summary><b>Walkthrough with curl</b></summary>
 
 ```bash
 API=http://localhost:3000/api/v1
 
-# 0. The operator signs in: the operator token is exchanged for a JWT access token (15 minutes).
+# 0. Operator signs in: the operator token is exchanged for a JWT (15 minutes)
 curl -s -X POST $API/auth/token -H 'Content-Type: application/json' -d '{"token":"local-admin-token-change-me"}'
 JWT=eyJ...   # paste accessToken
 
-# 1. Operator creates an account (starts on Starter). Copy the apiKey from the response - it is shown once.
+# 1. Create an account (starts on Starter); the apiKey is shown once
 curl -s -X POST $API/admin/accounts -H "Authorization: Bearer $JWT" \
   -H 'Content-Type: application/json' -d '{"name":"Acme Docs"}'
 KEY=umk_live_...   # paste the key
 
-# 2. The application registers users (default plan Basic; Premium has a fixed id)
+# 2. Register users (default Basic; Premium has a fixed id)
 curl -s -X POST $API/users -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"externalUserId":"ahmad"}'
 curl -s -X POST $API/users -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"externalUserId":"sara","planId":"00000000-0000-4000-8000-000000000004"}'
 
-# 3. Consume: accepted (200, "accepted": true, remaining for account and user)
+# 3. Accepted
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"userId":"ahmad","units":10,"requestId":"doc-1001"}'
 
-# 4. Rejection: 25 > Basic's 20 per request (200, "accepted": false, rule + level)
+# 4. Rejected: 25 > Basic's 20 per request (rule + level in the response)
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"userId":"ahmad","units":25,"requestId":"doc-1002"}'
 
-# 5. Retry of doc-1001: replayed, nothing consumed again ("idempotentReplay": true)
+# 5. Retry of doc-1001: replayed, nothing consumed again
 curl -si -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"userId":"ahmad","units":10,"requestId":"doc-1001"}'
 
-# 6. Plan change: a small custom shared plan, assigned to the account
+# 6. Plan change: a small custom shared plan
 PLAN=$(curl -s -X POST $API/plans -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"name":"Tiny pool","scope":"account","monthlyAllowance":50,"maxUnitsPerRequest":100}' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 curl -s -X PUT $API/account/plan -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d "{\"planId\":\"$PLAN\"}"
-# sara (Premium) asks for 45: only 40 shared units remain -> rejected at the ACCOUNT level
+# sara (Premium) asks for 45 with 40 shared units left: rejected at the ACCOUNT level
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"userId":"sara","units":45,"requestId":"doc-1003"}'
-# raise the plan (creates version 2) and try again with a new requestId -> accepted
+# raise the plan (version 2) and retry with a new requestId: accepted
 curl -s -X PATCH $API/plans/$PLAN -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"monthlyAllowance":500}'
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"userId":"sara","units":45,"requestId":"doc-1004"}'
 
-# 7. History (accepted and rejected), any month, filters: userId, outcome, month, from, to
+# 7. History and monthly summary
 curl -s "$API/usage?pageSize=10&outcome=rejected" -H "X-API-Key: $KEY"
 curl -s "$API/account/usage-summary?month=2026-10" -H "X-API-Key: $KEY"
 
@@ -296,38 +397,42 @@ curl -s "$API/account/usage-summary?month=2026-10" -H "X-API-Key: $KEY"
 curl -s -X POST $API/quotas/check -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"userId":"ahmad","units":5}'
 ```
 
-## 6. Supported rules and evaluation order
+</details>
 
-Two rule types, on **both** the account plan and the user plan:
+---
+
+## 📏 Quota rules
 
 | Rule | Meaning |
 |---|---|
-| `MONTHLY_ALLOWANCE` | Total units per **UTC calendar month**. |
-| `MAX_UNITS_PER_REQUEST` | Largest amount a single request may consume. |
+| `MONTHLY_ALLOWANCE` | Total units per **UTC calendar month** |
+| `MAX_UNITS_PER_REQUEST` | Largest amount a single request may consume |
 
-A request is accepted only if all four checks pass. They run in a fixed order and the **first
-failure** is reported as `rejection` (all failures are listed in `violations`):
+Both rules apply on both levels. A request is accepted only if all four checks pass. They are checked
+in a fixed order, and the **first failure** is reported as `rejection` (all failures appear in
+`violations`):
 
 1. user `MAX_UNITS_PER_REQUEST`
 2. account `MAX_UNITS_PER_REQUEST`
 3. user `MONTHLY_ALLOWANCE`
 4. account `MONTHLY_ALLOWANCE`
 
-Per-request rules come first because they are independent of current usage (a retry next month
-would fail the same way); the user level comes before the account level because it is the more
-specific limit. A rejection consumes nothing — there is no partial consumption. An accepted
-request adds the units to the user's and the account's counters for the month in which it was
-processed. The pure evaluation lives in
-[`Domain/Quotas/QuotaPolicy.ts`](backend/src/Domain/Quotas/QuotaPolicy.ts). No extra rule types
-were added.
+Per-request rules come first because they do not depend on current usage. The user level comes before
+the account level because it is the more specific limit. There is no partial consumption. The pure
+evaluation lives in [`QuotaPolicy.ts`](backend/src/Domain/Quotas/QuotaPolicy.ts).
 
-`remaining = max(0, allowance − consumed)`; `utilizationPercent` is the real ratio and can exceed
-100 % after a reduction. Status: `ok` (< 80 %), `warning` (≥ 80 %), `exhausted` (0 remaining),
-`over_allowance` (consumed > allowance).
+`remaining = max(0, allowance − consumed)`. Status is `ok` (< 80 %), `warning` (≥ 80 %), `exhausted`
+(0 remaining) or `over_allowance` (consumed > allowance after a reduction).
 
-## 7. Predefined plans
+<p align="center">
+  <img src="docs/uml/svg/10-activity-quota-decision.svg" alt="Quota decision activity diagram" width="60%">
+</p>
 
-Seeded at every startup with fixed ids (idempotent, never overwritten); read-only.
+---
+
+## 🗂️ Plans and plan changes
+
+Predefined plans are seeded at every startup with fixed ids and are read-only.
 
 | Plan | Scope | Monthly allowance | Max per request | id |
 |---|---|---|---|---|
@@ -338,274 +443,255 @@ Seeded at every startup with fixed ids (idempotent, never overwritten); read-onl
 
 New accounts start on **Starter** and new users on **Basic** unless another plan is given.
 
-## 8. Plan changes
+- Plans live in the database, so changes apply **without redeploying**.
+- Changing a limit of a custom plan inserts a new **immutable version**; every account or user on the
+  plan uses it from the next request. Renames do not create versions.
+- Switching plans **keeps the units already consumed** this month: counters belong to the account or
+  user and the month, not to the plan.
+- Reducing an allowance below current usage shows 0 remaining and rejects that level until it is raised
+  or the month changes.
+- History is never rewritten: each record stores both plan versions that decided it.
+- Predefined plans answer `403 PLAN_READ_ONLY`; a plan of the wrong scope answers `422 PLAN_SCOPE_MISMATCH`
+  (also enforced by a foreign key); another account's plan answers `404`.
 
-- Plans live in the database, so changes take effect **without redeploying**.
-- `PATCH /plans/:id` on a custom plan: a change to a limit inserts a new **immutable version** and points
-  the plan at it (renames do not create versions). Every account/user on that plan uses the new
-  limits from the next request.
-- Assigning a plan (`PUT /account/plan`, `PUT /users/:id/plan`) **keeps units already consumed**
-  this month — counters belong to the account/user and month, not to the plan.
-- Reducing an allowance below current usage shows **0 remaining** (`over_allowance`) and rejects
-  that level until the allowance is raised or a new month starts.
-- History is never rewritten: each record stores the account plan version and user plan version that
-  decided it.
-- Predefined plans → `403 PLAN_READ_ONLY`; a user plan on an account (or vice versa) →
-  `422 PLAN_SCOPE_MISMATCH` (also enforced by a composite foreign key in the database); another
-  account's custom plan → `404`.
+---
 
-## 9. Retry behaviour and idempotency
+## 🔁 Idempotency and retries
 
-- `requestId` (in the consume body) is the idempotency key, scoped to the account:
-  `UNIQUE (account_id, request_id)`. The fingerprint is `(userId, units)`.
-- **Same key, same payload** → the stored decision is returned again, accepted **or rejected**, with
-  `"idempotentReplay": true` and header `Idempotent-Replayed: true`. Nothing is consumed again; the
-  response shows the counters as they were right after the original decision.
-- **Same key, different payload** → `409 IDEMPOTENCY_KEY_REUSED`.
-- Because rejections are stored and replayed too, retrying a rejected request with the same key gives
-  the same rejection. To re-evaluate (e.g. after a plan change), send a **new** `requestId`.
-- Concurrent duplicates: the second request waits for the first to commit, then replays it (tested
-  with 30 simultaneous copies → one record, one consumption).
-- Safe to retry after timeouts or network errors: the decision and the idempotency record are
-  written in the same transaction, so they can never disagree.
+- `requestId` is the idempotency key, scoped to the account (`UNIQUE (account_id, request_id)`); the
+  fingerprint is `(userId, units)`.
+- **Same key, same payload:** the stored decision (accepted **or** rejected) is returned with
+  `"idempotentReplay": true` and the header `Idempotent-Replayed: true`. Nothing is consumed again.
+- **Same key, different payload:** `409 IDEMPOTENCY_KEY_REUSED`.
+- To re-evaluate after a plan change, send a **new** `requestId`.
+- Concurrent duplicates wait for the first copy to commit and then replay it (tested with 30
+  simultaneous copies: one record, one consumption).
+- The decision and the idempotency record are written in one transaction, so retrying after a timeout
+  is always safe.
 
-## 10. Concurrency strategy
+---
 
-Consumption is never "read, check in memory, write". The whole decision is one PostgreSQL
-transaction ([`ConsumeUnitsCommand`](backend/src/Application/Modules/Usage/Commands/ConsumeUnitsCommand.ts)):
+## ⚙️ Concurrency
 
-1. `pg_advisory_xact_lock(hash(account, requestId))` — concurrent copies of one request queue here.
-2. Look up the request id → replay or 409.
-3. `SELECT … FOR UPDATE` the **account** counter row for the month, then the **user** counter row
-   (created with `INSERT … ON CONFLICT DO NOTHING` on the first request of a month). The fixed order —
-   account, then user — prevents deadlocks.
-4. Read both current plan versions **after** the locks, so a plan change committed before is seen.
-5. Evaluate (pure domain function).
-6. If accepted, increment both counters in one statement.
+Consumption is never "read, check in memory, write". The whole decision is one PostgreSQL transaction
+([`ConsumeUnitsCommand`](backend/src/Application/Modules/Usage/Commands/ConsumeUnitsCommand.ts)):
+
+1. `pg_advisory_xact_lock(hash(account, requestId))`: concurrent copies of one request queue here.
+2. Look up the request id: replay or `409`.
+3. `SELECT … FOR UPDATE` the **account** counter, then the **user** counter. The fixed order prevents deadlocks.
+4. Read both current plan versions **after** the locks.
+5. Evaluate with the pure domain function.
+6. If accepted, increment both counters.
 7. Insert the usage record (accepted or rejected).
-8. Commit. Any error rolls everything back. Deadlock/serialization errors (not expected given the lock
-   order) are retried up to 3 times, re-running the whole unit.
+8. Commit. Deadlock or serialization errors retry the whole unit up to 3 times.
 
-Correctness comes from the row locks, so the default READ COMMITTED isolation is enough. Nothing relies
-on in-process mutexes; several API instances can share the database. The concurrency tests fire up
-to 150 simultaneous requests and then verify **counters = sum of accepted records** at both levels
-and that no limit was exceeded, including while the plan is being changed concurrently.
+Row locks make the default READ COMMITTED isolation sufficient, and nothing relies on in-process mutexes,
+so several API instances can share the database. Tests fire up to 150 simultaneous requests and verify
+that **counters = sum of accepted records** at both levels and that no limit is exceeded, even during
+concurrent plan changes.
 
-## 11. Product assumptions
+<p align="center">
+  <img src="docs/uml/svg/02-sequence-consume.svg" alt="Consume sequence diagram" width="90%">
+</p>
 
-| # | Assumption | Reasoning |
+---
+
+## 🤖 AI Usage Advisor
+
+`POST /api/v1/ai/advisor` (the **AI Advisor** page). The service computes the facts (quotas, rejections
+by rule, top accounts and users, daily volume, unusual days) and the model only explains them as
+validated JSON. With an account token it sees only that account; the operator sees cross-account
+aggregates. The model cannot query the database or change anything.
+
+| Variable | Default | Description |
 |---|---|---|
-| 1 | Units are integers 1 – 1,000,000 per request; counters are BIGINT. | No floating point; an upper bound rejects absurd input early. |
-| 2 | The period is the **UTC** month of the server's processing time. | The brief says usage belongs to the month in which it is processed; clients' clocks are not trusted. |
-| 3 | Rule order as in §6; the first failure is reported, all are listed. | Deterministic, explains the most specific cause first. |
-| 4 | A quota rejection is `200` with `accepted: false`; validation is `400`, auth `401`. | A rejection is a valid business answer, not a client error; clients branch on `accepted`. |
-| 5 | Rejected decisions are stored and replayed. | History shows rejections; a retry gets a stable answer. Re-evaluation needs a new request id. |
-| 6 | Callers identify users by their own `externalUserId` (unique per account). | Clients do not need to store our ids. The same id can exist in different accounts. |
-| 7 | Consuming for an unknown user is `404 USER_NOT_FOUND` and is not recorded. | It is not a quota decision; users are registered explicitly (no implicit creation). |
-| 8 | New accounts default to Starter, new users to Basic; operator-created accounts may only start on a predefined plan. | Custom plans belong to an account, which does not exist yet at creation. |
-| 9 | Custom plan names are unique per account (case-insensitive). | Avoids confusing duplicates in the UI. |
-| 10 | Utilization ≥ 80 % = "approaching the limit"; an allowance of 0 counts as 100 %. | Simple, documented threshold used everywhere. |
-| 11 | Dry runs (`/quotas/check`) are advisory and never recorded. | They change nothing; consume re-checks atomically. |
-| 12 | Quota views for a past month compare that month's consumption with the plan's **current** limits. | Counters per month are exact; each record keeps the exact plan version that decided it. |
-| 13 | The operator token is a single static secret. | The brief excludes end-user login/RBAC; documented as local/demo only. |
+| `AI_PROVIDER` | `mock` | `mock` (deterministic, labelled) or `openai` (OpenAI or any OpenAI-compatible API) |
+| `OPENAI_API_KEY` | – | Required for `openai`; server-side only |
+| `OPENAI_MODEL` | – | Required for `openai`; verified at startup |
+| `OPENAI_BASE_URL` | – | An OpenAI-compatible API, e.g. `https://openrouter.ai/api/v1` |
+| `OPENAI_TIMEOUT_MS` / `AI_MAX_OUTPUT_TOKENS` | 20000 / 800 | Per attempt / output budget (reasoning models need about 3000) |
+| `AI_RATE_LIMIT_PER_WINDOW` / `AI_RATE_LIMIT_WINDOW_MS` | 10 / 60000 | Per credential |
 
-## 12. Design decisions and trade-offs
+To enable it with Compose, create a `.env` file next to `docker-compose.yml` (it is ignored by Git):
 
-**Architecture.** One deployable API and one PostgreSQL database (modular monolith).
-
-```text
-docker-compose.yml   full stack (postgres + backend + frontend)
-docs/                API contract
-backend/             the API - own package.json, lockfile, Dockerfile
-  src/
-    Domain/          pure business rules: QuotaPolicy (two-level evaluation), periods, plan rules, API key value object
-    Application/     use cases (Commands = writes, Queries = reads), repository interfaces, DTO mapping
-    Infrastructure/  PostgreSQL (pool, migrations, seed, transaction manager, repositories), AI providers
-    Presentation/    Fastify routes, error envelope, OpenAPI
-    Shared/          AppError + status mapping, auth/request-id middleware, validation
-    contracts/       DTO types, zod request schemas, error codes, pagination (the API contract)
-    container.ts     composition root (constructor injection, the only place that knows concrete classes)
-  tests/             unit, integration, concurrency, performance
-  scripts/           CLI example client
-frontend/            the web app - own package.json, lockfile, Dockerfile
-  src/               models, services (HTTP + mock behind one interface), view_models (hooks), views, widgets
-    contracts/       copy of backend/src/contracts, imported as '@/contracts'
+```ini
+AI_PROVIDER=openai
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_API_KEY=<your key>
+OPENAI_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+OPENAI_TIMEOUT_MS=40000
+AI_MAX_OUTPUT_TOKENS=3000
 ```
 
-**Two independent parts.** `backend/` and `frontend/` share no build tooling and can be installed,
-tested, built and deployed separately. The price is that the contract files exist twice: when the
-API contract changes, update `backend/src/contracts` and copy the same change to
-`frontend/src/contracts` (the files are identical; `diff -r backend/src/contracts frontend/src/contracts`
-must print nothing).
+Then run `docker compose up -d`. Provider errors are reported by kind (no credit, rate limit, rejected
+key, cut-off answer) without leaking details.
 
-Tracing a consume request: `Presentation/Routes/usage.routes.ts` → `ConsumeUnitsCommand.execute` →
-`Domain/Quotas/QuotaPolicy.evaluateRequest` → SQL in `PostgresQuotaRepository` /
-`PostgresUsageRepository`, all inside `PostgresTransactionManager.run`.
+<details>
+<summary><b>AI advisor sequence diagram</b></summary>
+<p align="center">
+  <img src="docs/uml/svg/05-sequence-ai-advisor.svg" alt="AI advisor sequence diagram" width="90%">
+</p>
+</details>
 
-**Schema** ([migration](backend/src/Infrastructure/Database/migrations/001_initial_schema.sql)):
-`plans` + immutable `plan_versions`; `accounts` (key hash, prefix, plan) and `users` (unique
-`(account_id, external_user_id)`); monthly counters `account_usage_counters (account_id, period)` and
-`user_usage_counters (user_id, period)`; `usage_records` (every decision, also the idempotency record).
-Check constraints guard units, allowances, outcomes and period dates; composite foreign keys enforce
-plan scope; indexes serve history pages `(account_id, created_at DESC, id DESC)` and friends. A new
-month needs no job: it simply uses new counter rows.
+---
 
-**Counters vs. summing records.** Decisions read a counter row instead of summing history: O(1) and
-lockable. The record table stays the audit trail; tests and the load test verify they agree.
-
-**Plain SQL with `pg`.** Explicit, reviewable queries; the concurrency-critical SQL is not hidden
-behind an ORM.
-
-**Auth.** API keys (required by the brief) hashed with SHA-256 (fine for 256-bit random keys and
-allows indexed lookup). No JWT/end-user login (out of scope).
-
-**Frontend.** React + TanStack Query (server state, short `staleTime` for quotas, invalidation after
-every mutation), URL search params for filters/sort/pagination (one `useListQuery` hook validating with the shared query DTO), a single-field login page (the server identifies the token) leading to two role-guarded interfaces (`/admin`, `/app`), reusable filter bars (quick filters, "More filters" panel, removable chips, sortable column headers), lazy-loaded pages, a mock adapter that
-follows the same business rules (Phase 1) and the HTTP adapter behind the same interfaces. The mock is
-never active in a production build unless explicitly configured.
-
-**Conflicts between the engineering spec and the brief** (the brief wins): API keys instead of JWT;
-an admin token for the operator dashboard; Compose runs the full stack; two-level quotas everywhere;
-a Client Demo page added; AI kept as an extension that respects account isolation.
-
-## 13. Testing
+## 🧪 Testing
 
 Run `npm install` once in each folder first.
 
 | Suite | Command | Needs |
 |---|---|---|
 | Frontend (Vitest + Testing Library) | `cd frontend && npm test` | nothing |
-| Backend unit (domain, validation, AI validation) | `cd backend && npm test` | nothing |
-| Backend integration (HTTP via `app.inject` + real PostgreSQL) | `cd backend && npm run test:integration` | PostgreSQL |
+| Backend unit | `cd backend && npm test` | nothing |
+| Backend integration (HTTP + real PostgreSQL) | `cd backend && npm run test:integration` | PostgreSQL |
 | Backend concurrency | `cd backend && npm run test:concurrency` | PostgreSQL |
-| Typecheck / lint / build | `npm run typecheck` · `npm run lint` · `npm run build` (in either folder) | nothing |
+| Typecheck / lint / build | `npm run typecheck` · `npm run lint` · `npm run build` | nothing |
 
-DB tests **recreate** the database named in `TEST_DATABASE_URL` (default
-`postgres://postgres:postgres@localhost:5432/metering_test`; the name must contain "test"). With
+Database tests **recreate** the database in `TEST_DATABASE_URL` (its name must contain "test"). With
 Compose: `TEST_DATABASE_URL=postgres://metering:metering@localhost:5433/metering_test`.
 
-Covered: the three worked examples from the brief (unit and end to end), rule order, boundaries,
-API key validation (missing / invalid / valid, hash-only storage), admin token, **account isolation**
-(users, plans, records, history, consumption → 404), idempotent replay (accepted and rejected), 409 on
-key reuse, dry run, validation errors, plan versions, scope mismatch, read-only predefined plans,
-switching plans, reductions below usage, UTC month rollover with an injectable clock, pagination and
-filters, migrations/seed idempotency, transaction rollback, AI scope and provider failures, and the
-concurrency cases in §10. Web tests include the full Client Demo scenario against the mock adapter.
+Latest run: 40 unit, 128 integration and 5 concurrency tests in the backend, and 82 frontend tests, all
+passing. They cover the brief's worked examples, rule order and boundaries, authentication (API keys,
+JWT expiry, refresh rotation and reuse, roles), account isolation, idempotent replay, plan versions and
+scope, month rollover with an injectable clock, pagination and filters, migrations and seed
+idempotency, rollback, AI scope and provider failures, and the full Client Demo scenario.
 
-## 14. Performance
+---
 
-Method, commands, dependencies and full results: [backend/tests/performance/RESULTS.md](backend/tests/performance/RESULTS.md).
-Summary (laptop, API + PostgreSQL + load generator on one machine, 50 connections):
+## 📈 Performance
+
+Full method and results: [backend/tests/performance/RESULTS.md](backend/tests/performance/RESULTS.md).
+Laptop, API + PostgreSQL + load generator on one machine, 50 connections:
 
 | Scenario | Before | After |
 |---|---|---|
-| hot: 1 account, 200 users (one counter row) | 365 req/s, p90 249 ms | 395 req/s, p90 137 ms |
-| spread: 50 accounts × 20 users | 798 req/s | 935 req/s |
-| history pages | 289 req/s, p50 162 ms | 678 req/s, p50 75 ms |
-| limit: 4,000 × 10 units vs 20,000 allowance | exactly 2,000 accepted | exactly 2,000 accepted |
+| Hot: 1 account, 200 users (one counter row) | 365 req/s, p90 249 ms | 395 req/s, p90 137 ms |
+| Spread: 50 accounts × 20 users | 798 req/s | 935 req/s |
+| History pages | 289 req/s, p50 162 ms | 678 req/s, p50 75 ms |
+| Limit: 4,000 × 10 units vs a 20,000 allowance | exactly 2,000 accepted | exactly 2,000 accepted |
 
-After every run: counters = sum of accepted records, no counter over its allowance. Learnings: joining
-before paginating made history slow (fixed by paging first); the hot account's row lock is the
-intended bottleneck, so the fix was fewer round trips while holding it; durability was not traded
-for speed (`synchronous_commit` stays on).
+After every run, counters equal the sum of accepted records and no counter exceeds its allowance.
+Durability was not traded for speed (`synchronous_commit` stays on).
 
-## 15. AI Usage Advisor
+---
 
-`POST /api/v1/ai/advisor` (page **AI Advisor**). The service computes the numbers (account/user
-quotas, rejections by rule, top accounts/users, daily volume, "unusual" days = more than twice the
-average) and the provider only explains them, returning a validated JSON structure.
+## 💻 Local development
 
-| Variable | Default | |
-|---|---|---|
-| `AI_PROVIDER` | `mock` | `mock` (deterministic, labelled as mock) or `openai` (OpenAI or any OpenAI-compatible API) |
-| `OPENAI_API_KEY` | – | required for `openai`; server-side only, never sent to the browser |
-| `OPENAI_MODEL` | – | required for `openai`; verified with the API at startup (warning if unknown) |
-| `OPENAI_BASE_URL` | – (OpenAI) | an OpenAI-compatible API instead, e.g. `https://openrouter.ai/api/v1`; called through Chat Completions with the same strict JSON schema |
-| `OPENAI_TIMEOUT_MS` / `AI_MAX_OUTPUT_TOKENS` | 20000 / 800 | per attempt (the SDK retries once) / output budget; reasoning models need more (e.g. 3000), a cut-off answer is reported as such |
-| `AI_RATE_LIMIT_PER_WINDOW` / `AI_RATE_LIMIT_WINDOW_MS` | 10 / 60000 | per credential |
-
-With an API key the advisor sees only that account; with the operator token it sees cross-account
-aggregates. The model cannot query the database or change anything. Prompts keep system
-instructions separate from the question and data, treat names as untrusted data, and cap their size;
-questions are not logged. The provider uses the official OpenAI SDK with a strict JSON schema: the
-Responses API for OpenAI, Chat Completions for compatible APIs. It was **verified live through
-OpenRouter** (`nvidia/nemotron-3-super-120b-a12b:free`, a free reasoning model): it ranked companies by
-rejections from the real data and answered Arabic questions in Arabic, in 15–25 s. Provider errors
-are reported by kind (no credit, rate limit, rejected key, cut-off answer) without forwarding details.
-
-To use it with Compose, create `.env` next to `docker-compose.yml` (ignored by Git):
-
-```
-AI_PROVIDER=openai
-OPENAI_BASE_URL=https://openrouter.ai/api/v1      # omit for OpenAI itself
-OPENAI_API_KEY=sk-or-...                           # never commit it
-OPENAI_MODEL=nvidia/nemotron-3-super-120b-a12b:free  # or openai/gpt-4o-mini with credit
-OPENAI_TIMEOUT_MS=40000
-AI_MAX_OUTPUT_TOKENS=3000
-```
-
-then `docker compose up -d`.
-
-## 16. Local development without Docker
-
-Requirements: Node.js 22+ and PostgreSQL 15+.
-
-Backend (terminal 1):
+**Requirements:** Node.js 22+ and PostgreSQL 15+.
 
 ```bash
+# Backend (terminal 1)
 cd backend
 npm install
-cp .env.example .env          # set DATABASE_URL and ADMIN_API_TOKEN
-npm run dev                   # http://localhost:3000 (migrates + seeds on start)
+cp .env.example .env          # set DATABASE_URL, ADMIN_API_TOKEN and JWT_SECRET
+npm run dev                   # http://localhost:3000 (migrates and seeds on start)
 ```
 
-Frontend (terminal 2):
-
 ```bash
+# Frontend (terminal 2)
 cd frontend
 npm install
-npm run dev                   # http://localhost:5173 with the in-browser mock adapter (no backend needed)
+npm run dev                   # http://localhost:5173 with the in-browser mock adapter
 npm run dev:api-mode          # http://localhost:5174 against the real API on :3000
 ```
 
-`npm run db:migrate` / `npm run db:seed` (in `backend/`) run the startup steps manually.
+`npm run db:migrate` and `npm run db:seed` (in `backend/`) run the startup steps by hand. When the API
+contract changes, update `backend/src/contracts` and copy the change to `frontend/src/contracts`;
+`diff -r backend/src/contracts frontend/src/contracts` must print nothing.
 
-## 17. Known limitations
+---
 
-- The operator token is a single static secret (local/demo); no key rotation endpoint yet (the
-  key-lookup cache would need invalidating if rotation were added).
+## 📝 Product assumptions
+
+| # | Assumption | Reasoning |
+|---|---|---|
+| 1 | Units are integers from 1 to 1,000,000 per request; counters are BIGINT. | No floating point; absurd input is rejected early. |
+| 2 | The period is the **UTC** month of the server's processing time. | Usage belongs to the month it is processed; client clocks are not trusted. |
+| 3 | Fixed rule order; the first failure is reported and all are listed. | Deterministic, and the most specific cause comes first. |
+| 4 | A quota rejection is `200` with `accepted: false`; validation is `400`, authentication `401`. | A rejection is a valid business answer; clients branch on `accepted`. |
+| 5 | Rejected decisions are stored and replayed. | History shows rejections and retries get a stable answer. |
+| 6 | Callers identify users by their own `externalUserId`, unique per account. | Clients do not need to store our ids. |
+| 7 | Consuming for an unknown user is `404 USER_NOT_FOUND` and is not recorded. | Users are registered explicitly. |
+| 8 | New accounts default to Starter and new users to Basic. | Custom plans belong to an account that does not exist yet at creation. |
+| 9 | Custom plan names are unique per account (case-insensitive). | Avoids confusing duplicates. |
+| 10 | Utilization ≥ 80 % means "approaching the limit"; an allowance of 0 counts as 100 %. | One documented threshold used everywhere. |
+| 11 | Dry runs (`/quotas/check`) are advisory and never recorded. | Consume re-checks atomically. |
+| 12 | Past-month quota views compare that month's consumption with the plan's **current** limits. | Each record keeps the exact plan version that decided it. |
+| 13 | The operator credential is a single configured secret, exchanged for an operator JWT. | End-user RBAC is outside the brief. |
+
+---
+
+## ⚖️ Design decisions and trade-offs
+
+- **Counters instead of summing records.** Decisions read one counter row (O(1) and lockable). The
+  record table remains the audit trail, and the tests check that both agree.
+- **Plain SQL with `pg`.** Explicit, reviewable queries; the concurrency-critical SQL is not hidden behind an ORM.
+- **JWT for the web app, API keys for machines.** Browsers use short-lived access tokens with rotating
+  refresh cookies; server-to-server clients may keep sending `X-API-Key`, as the brief requires.
+- **SHA-256 for keys and tokens.** Suitable for 256-bit random secrets and allows indexed lookup.
+- **Two independent parts.** `backend/` and `frontend/` share no build tooling and deploy separately; the
+  price is that the contract files exist twice.
+- **Frontend state.** TanStack Query for server state, URL search params for filters, sorting and
+  pagination, lazy-loaded pages, and a mock adapter behind the same interfaces as the HTTP adapter.
+- **Same-origin API.** nginx proxies `/api/*`, which removes CORS from the browser path and allows a strict CSP.
+
+---
+
+## ⚠️ Known limitations
+
+- The operator credential is a single static secret, with no rotation endpoint yet.
 - Quota views for past months use the current plan limits (records keep the exact versions).
-- One account's consumes serialize on its counter row (~400 decisions/s for a single account on
-  the test laptop); many accounts scale independently. Sharded counters would be the next step.
-- History totals use `count(*)`; for very large single-account months this costs ~90 ms (cursor
+- One account's consumes serialize on its counter row (~400 decisions/s for a single account on the test
+  laptop); many accounts scale independently. Sharded counters would be the next step.
+- History totals use `count(*)`, which costs about 90 ms for very large single-account months (cursor
   pagination would avoid it).
-- The AI advisor was verified live through OpenRouter (free model), not against OpenAI itself (that key had no credit); free models are slower (15–25 s) and rate-limited by OpenRouter.
-- `npm audit` reports advisories only in dev tooling (vitest's `tinypool`); not part of any image.
+- The AI advisor was verified through OpenRouter with a free model (15–25 s per answer, rate-limited by
+  the provider), not against OpenAI itself.
+- `npm audit` reports advisories only in dev tooling, which is not part of any image.
 
-## 18. UML diagrams
+---
 
-The diagrams are written in [PlantUML](https://plantuml.com/) and live in [docs/uml](docs/uml).
-Rendered SVG and PNG files are committed next to the sources.
+## 📐 UML diagrams
 
-| Type | Diagram | Shows |
-| --- | --- | --- |
-| Use cases | [01-use-cases](docs/uml/svg/01-use-cases.svg) ([PNG](docs/uml/png/01-use-cases.png), [source](docs/uml/01-use-cases.puml)) | Actors (applicant, company owner, client application, operator, AI provider) and what each can do |
-| Sequence | [02-sequence-consume](docs/uml/svg/02-sequence-consume.svg) ([PNG](docs/uml/png/02-sequence-consume.png), [source](docs/uml/02-sequence-consume.puml)) | `POST /usage/consume`: one transaction, advisory lock, idempotency, row locks, evaluation |
-| Sequence | [03-sequence-jwt-auth](docs/uml/svg/03-sequence-jwt-auth.svg) ([PNG](docs/uml/png/03-sequence-jwt-auth.png), [source](docs/uml/03-sequence-jwt-auth.puml)) | Sign-in, authenticated request, silent refresh, reuse detection, reload, sign-out |
-| Sequence | [04-sequence-signup](docs/uml/svg/04-sequence-signup.svg) ([PNG](docs/uml/png/04-sequence-signup.png), [source](docs/uml/04-sequence-signup.puml)) | Sign-up request, operator approval or denial, one-time API key collection |
-| Sequence | [05-sequence-ai-advisor](docs/uml/svg/05-sequence-ai-advisor.svg) ([PNG](docs/uml/png/05-sequence-ai-advisor.png), [source](docs/uml/05-sequence-ai-advisor.puml)) | AI Usage Advisor: context building and the mock or OpenAI-compatible provider |
-| Class | [06-class-domain](docs/uml/svg/06-class-domain.svg) ([PNG](docs/uml/png/06-class-domain.png), [source](docs/uml/06-class-domain.puml)) | Domain model: accounts, users, plans and versions, counters, usage records, tokens |
-| Component | [07-component-architecture](docs/uml/svg/07-component-architecture.svg) ([PNG](docs/uml/png/07-component-architecture.png), [source](docs/uml/07-component-architecture.puml)) | Frontend and backend layers (Presentation, Application, Domain, Infrastructure) |
-| Deployment | [08-deployment](docs/uml/svg/08-deployment.svg) ([PNG](docs/uml/png/08-deployment.png), [source](docs/uml/08-deployment.puml)) | Docker Compose: nginx, API, PostgreSQL, network, volume, loopback ports |
-| ER | [09-er-database](docs/uml/svg/09-er-database.svg) ([PNG](docs/uml/png/09-er-database.png), [source](docs/uml/09-er-database.puml)) | PostgreSQL schema from migrations 001-005 with keys and constraints |
-| Activity | [10-activity-quota-decision](docs/uml/svg/10-activity-quota-decision.svg) ([PNG](docs/uml/png/10-activity-quota-decision.png), [source](docs/uml/10-activity-quota-decision.puml)) | How one consume request is accepted or rejected (rule order) |
-| State | [11-state-signup-request](docs/uml/svg/11-state-signup-request.svg) ([PNG](docs/uml/png/11-state-signup-request.png), [source](docs/uml/11-state-signup-request.puml)) | Life cycle of a sign-up request |
-| State | [12-state-refresh-token](docs/uml/svg/12-state-refresh-token.svg) ([PNG](docs/uml/png/12-state-refresh-token.png), [source](docs/uml/12-state-refresh-token.puml)) | Life cycle of a refresh token in a session family |
+All diagrams are written in [PlantUML](https://plantuml.com/) and live in [`docs/uml`](docs/uml), with
+rendered SVG and PNG files next to the sources. The architecture, domain, security, quota and
+concurrency sections above embed the most relevant ones.
 
-![Use cases](docs/uml/svg/01-use-cases.svg)
+| # | Type | Diagram | Shows |
+|---|---|---|---|
+| 01 | Use case | [Use cases](docs/uml/svg/01-use-cases.svg) · [source](docs/uml/01-use-cases.puml) | Actors and what each can do |
+| 02 | Sequence | [Consume units](docs/uml/svg/02-sequence-consume.svg) · [source](docs/uml/02-sequence-consume.puml) | One transaction: advisory lock, idempotency, row locks, evaluation |
+| 03 | Sequence | [JWT authentication](docs/uml/svg/03-sequence-jwt-auth.svg) · [source](docs/uml/03-sequence-jwt-auth.puml) | Sign-in, refresh, reuse detection, reload, sign-out |
+| 04 | Sequence | [Sign-up](docs/uml/svg/04-sequence-signup.svg) · [source](docs/uml/04-sequence-signup.puml) | Request, approval or denial, one-time key collection |
+| 05 | Sequence | [AI advisor](docs/uml/svg/05-sequence-ai-advisor.svg) · [source](docs/uml/05-sequence-ai-advisor.puml) | Context building and the provider call |
+| 06 | Class | [Domain model](docs/uml/svg/06-class-domain.svg) · [source](docs/uml/06-class-domain.puml) | Entities, value objects and the quota policy |
+| 07 | Component | [Architecture](docs/uml/svg/07-component-architecture.svg) · [source](docs/uml/07-component-architecture.puml) | Frontend and backend layers |
+| 08 | Deployment | [Docker Compose](docs/uml/svg/08-deployment.svg) · [source](docs/uml/08-deployment.puml) | Containers, network, volume, ports |
+| 09 | ER | [Database schema](docs/uml/svg/09-er-database.svg) · [source](docs/uml/09-er-database.puml) | Tables, keys and constraints (migrations 001 to 005) |
+| 10 | Activity | [Quota decision](docs/uml/svg/10-activity-quota-decision.svg) · [source](docs/uml/10-activity-quota-decision.puml) | How one consume request is accepted or rejected |
+| 11 | State | [Sign-up request](docs/uml/svg/11-state-signup-request.svg) · [source](docs/uml/11-state-signup-request.puml) | Life cycle of a sign-up request |
+| 12 | State | [Refresh token](docs/uml/svg/12-state-refresh-token.svg) · [source](docs/uml/12-state-refresh-token.puml) | Life cycle of a refresh token |
 
-After editing a `.puml` file, render all diagrams again with the public PlantUML server
-(set `PLANTUML_SERVER` to use your own server):
+### Use cases
+
+<p align="center">
+  <img src="docs/uml/svg/01-use-cases.svg" alt="Use case diagram" width="90%">
+</p>
+
+### State machines
+
+<table>
+  <tr>
+    <th>Sign-up request</th>
+    <th>Refresh token</th>
+  </tr>
+  <tr>
+    <td><img src="docs/uml/svg/11-state-signup-request.svg" alt="Sign-up request state diagram"></td>
+    <td><img src="docs/uml/svg/12-state-refresh-token.svg" alt="Refresh token state diagram"></td>
+  </tr>
+</table>
+
+After editing a `.puml` file, render all diagrams again (set `PLANTUML_SERVER` to use your own server):
 
 ```bash
 node docs/uml/render.mjs
@@ -613,5 +699,23 @@ node docs/uml/render.mjs
 
 ---
 
-Final Project of the Boot.dev Plan (TypeScript) – 2026-C3. Remember to submit the internship's
-feedback form with the repository link.
+## 📚 Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Plain-language guide to every page of the web app |
+| [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md) | Endpoints, DTOs, error codes |
+| [docs/DATABASE.md](docs/DATABASE.md) | Tables, normalization, constraints, indexes |
+| [docs/SECURITY.md](docs/SECURITY.md) | Authentication, permissions, page separation, security controls |
+| [backend/tests/performance/RESULTS.md](backend/tests/performance/RESULTS.md) | Load test method and results |
+| [docs/uml](docs/uml) | PlantUML sources and rendered diagrams |
+
+---
+
+<div align="center">
+
+Final Project of the Boot.dev Plan (TypeScript), 2026-C3
+
+Built by [Qais Rjoob](https://github.com/QaisRjoob)
+
+</div>
