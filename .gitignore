@@ -1,17 +1,27 @@
+# Dependencies and build output
 node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+*.tgz
+.eslintcache
+
+# Environment files: never commit real configuration. Only the templates are tracked.
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
 # Non-secret: points the web app at the local API (cd frontend && npm run dev:api-mode).
 !frontend/.env.api
+
+# Logs and runtime files
 *.log
+npm-debug.log*
+*.pid
+
+# Operating system and editor files
 .DS_Store
+Thumbs.db
+desktop.ini
 .vscode/
 .idea/
-
-# Local Claude Code / editor settings
-.claude/
+*.swp
