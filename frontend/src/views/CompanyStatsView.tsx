@@ -26,6 +26,7 @@ import { QuotaProgressBar } from '@/widgets/quotas/QuotaProgressBar';
 import { QuotaStatusBadge } from '@/widgets/quotas/QuotaStatusBadge';
 import { Button } from '@/widgets/ui/Button';
 import { Card, CardBody, CardHeader } from '@/widgets/ui/Card';
+import { useChartTheme } from '@/providers/themeContext';
 
 const FIELDS = ['search', 'status', 'planId', 'activity', 'month'] as const;
 
@@ -95,21 +96,22 @@ const columns: Column<CompanyStatsRow>[] = [
 
 /** Share of the month's usage of the busiest companies (top 10). */
 function UsageShareChart({ rows }: { rows: CompanyStatsRow[] }) {
+  const chart = useChartTheme();
   const data = rows.filter((row) => row.quota.consumed > 0).map((row) => ({ name: row.account.name, share: row.shareOfUsagePercent, units: row.quota.consumed }));
   if (data.length === 0) return <EmptyState title="No usage in this month" />;
   return (
     <div style={{ height: Math.max(160, data.length * 30) }} role="img" aria-label="Share of usage per company">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-          <XAxis type="number" domain={[0, 100]} tickFormatter={(value: number) => `${value}%`} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-          <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11, fill: '#334155' }} tickLine={false} axisLine={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} horizontal={false} />
+          <XAxis type="number" domain={[0, 100]} tickFormatter={(value: number) => `${value}%`} tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11, fill: chart.label }} tickLine={false} axisLine={false} />
           <Tooltip
             formatter={(_value, _name, item) => {
               const payload = item.payload as { share: number; units: number };
               return [`${formatPercent(payload.share)} (${formatUnits(payload.units)} units)`, 'Share of usage'];
             }}
-            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            contentStyle={chart.tooltip}
           />
           <Bar dataKey="share" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false} />
         </BarChart>

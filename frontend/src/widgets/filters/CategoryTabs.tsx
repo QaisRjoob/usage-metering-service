@@ -27,7 +27,7 @@ export function CategoryTabs({ label, value, options, onChange }: { label: strin
             onClick={() => onChange(option.value)}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-              selected ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+              selected ? 'border-solid-brand bg-solid-brand text-white' : 'border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:bg-slate-50',
             )}
           >
             <span className="max-w-48 truncate">{option.label}</span>

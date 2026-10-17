@@ -8,6 +8,7 @@ import { formatMonthLabel } from '@/utils/dateUtils';
 import { cn } from '@/utils/formatUtils';
 import { formatCompact, formatUnits } from '@/utils/numberUtils';
 import { EmptyState } from '@/widgets/common/EmptyState';
+import { useChartTheme } from '@/providers/themeContext';
 
 const tones = {
   neutral: 'bg-slate-50 text-slate-900 [&_dt]:text-slate-500',
@@ -53,17 +54,18 @@ export function RejectionChips({ items, linkFor }: { items: RejectionBreakdownIt
 
 /** Units consumed (bars) and accepted / rejected requests (lines) for six months. */
 export function MonthlyTrendChart({ data, height = 240 }: { data: MonthlyUsagePoint[]; height?: number }) {
+  const chart = useChartTheme();
   const hasData = data.some((point) => point.unitsConsumed > 0 || point.acceptedRequests > 0 || point.rejectedRequests > 0);
   if (!hasData) return <EmptyState title="No usage in the last six months" />;
   return (
     <div style={{ height }} role="img" aria-label="Monthly usage chart: units consumed, accepted and rejected requests over six months">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-          <XAxis dataKey="period" tickFormatter={(value: string) => formatMonthLabel(value).split(' ')[0]!.slice(0, 3)} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-          <YAxis yAxisId="units" tickFormatter={(value: number) => formatCompact(value)} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-          <YAxis yAxisId="requests" orientation="right" allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-          <Tooltip labelFormatter={(label) => formatMonthLabel(String(label))} formatter={(value, name) => [formatUnits(Number(value)), name]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
+          <XAxis dataKey="period" tickFormatter={(value: string) => formatMonthLabel(value).split(' ')[0]!.slice(0, 3)} tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} />
+          <YAxis yAxisId="units" tickFormatter={(value: number) => formatCompact(value)} tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} />
+          <YAxis yAxisId="requests" orientation="right" allowDecimals={false} tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} />
+          <Tooltip labelFormatter={(label) => formatMonthLabel(String(label))} formatter={(value, name) => [formatUnits(Number(value)), name]} contentStyle={chart.tooltip} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Bar yAxisId="units" dataKey="unitsConsumed" name="Units consumed" fill="#6366f1" radius={[3, 3, 0, 0]} isAnimationActive={false} />
           <Line yAxisId="requests" dataKey="acceptedRequests" name="Accepted requests" stroke="#10b981" strokeWidth={2} type="monotone" isAnimationActive={false} />

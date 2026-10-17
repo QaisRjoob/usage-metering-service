@@ -8,6 +8,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Match only the exact path (for section roots like /admin). */
   end?: boolean;
+  /** A count shown next to the label (e.g. requests waiting for a decision); hidden when 0. */
+  badge?: number;
 }
 
 export interface NavSection {
@@ -36,7 +38,12 @@ export function Sidebar({ sections, onNavigate }: { sections: NavSection[]; onNa
                   }
                 >
                   <item.icon className="size-4" aria-hidden="true" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge ? (
+                    <span className="rounded-full bg-solid-brand px-1.5 py-0.5 text-[10px] leading-none font-semibold text-white tabular-nums" aria-label={`${item.badge} waiting`}>
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </NavLink>
               </li>
             ))}

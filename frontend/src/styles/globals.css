@@ -3,11 +3,100 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, monospace;
+  /* Card and panel background (white in light mode). Text on brand colours stays text-white. */
+  --color-surface: #ffffff;
+  /* Solid fills under white text: fixed so the text stays readable in both themes. */
+  --color-solid-brand: #4f46e5;
+  --color-solid-brand-hover: #4338ca;
+  --color-solid-danger: #e11d48;
+  --color-solid-danger-hover: #be123c;
+  --color-solid-success: #059669;
+  /* High-contrast fill (secondary buttons): dark in light mode, light in dark mode. */
+  --color-ink: #0f172a;
+  --color-ink-hover: #1e293b;
+  --color-on-ink: #ffffff;
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
   --color-brand-500: #6366f1;
   --color-brand-600: #4f46e5;
   --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+}
+
+/*
+ * Dark theme: <html data-theme="dark">. Tailwind v4 utilities read the palette from CSS
+ * variables, so remapping the scales here themes every page without per-component classes:
+ * slate is inverted (50 = page background, 900 = primary text), tints (50-200) become dark
+ * tints and text shades (600-900) become light so they stay readable on dark surfaces.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-surface: #0f172a;
+  --color-solid-brand: #5b5cf0;
+  --color-solid-brand-hover: #4f46e5;
+  --color-ink: #e2e8f0;
+  --color-ink-hover: #cbd5e1;
+  --color-on-ink: #0f172a;
+
+  --color-slate-50: #0b1120;
+  --color-slate-100: #141d31;
+  --color-slate-200: #1f2a40;
+  --color-slate-300: #334155;
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #b4c0d0;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #f1f5f9;
+  --color-slate-950: #f8fafc;
+
+  --color-brand-50: #1b1a45;
+  --color-brand-100: #24235c;
+  --color-brand-200: #312e81;
+  --color-brand-300: #4338ca;
+  --color-brand-400: #6366f1;
+  --color-brand-500: #6d72f5;
+  --color-brand-600: #6366f1;
+  --color-brand-700: #a5b4fc;
+  --color-brand-800: #c7d2fe;
+  --color-brand-900: #e0e7ff;
+
+  --color-emerald-50: #062c22;
+  --color-emerald-100: #073d2f;
+  --color-emerald-200: #0b5a44;
+  --color-emerald-300: #10b981;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+
+  --color-rose-50: #2d1119;
+  --color-rose-100: #3d1520;
+  --color-rose-200: #5c1d2c;
+  --color-rose-300: #9f1239;
+  --color-rose-400: #fb7185;
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+
+  --color-amber-50: #2b1f07;
+  --color-amber-100: #3b2a09;
+  --color-amber-200: #5c420e;
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  --color-sky-50: #072a40;
+  --color-sky-200: #0c4a6e;
+  --color-sky-600: #38bdf8;
+  --color-sky-700: #7dd3fc;
+  --color-sky-900: #e0f2fe;
 }
 
 @layer base {
@@ -17,6 +106,9 @@
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
     font-family: var(--font-sans);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-600;

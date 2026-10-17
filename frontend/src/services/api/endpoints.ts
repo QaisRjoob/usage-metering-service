@@ -7,6 +7,12 @@ export const endpoints = {
   auth: {
     identify: '/auth/identify',
   },
+
+  signup: {
+    submit: '/signup-requests',
+    status: '/signup-requests/status',
+    claim: '/signup-requests/claim',
+  },
   ready: '/ready',
 
   admin: {
@@ -20,6 +26,9 @@ export const endpoints = {
     accountUsageSummary: (accountId: string) => `/admin/accounts/${segment(accountId)}/usage-summary`,
     accountUser: (accountId: string, userId: string) => `/admin/accounts/${segment(accountId)}/users/${segment(userId)}`,
     companyStats: '/admin/analytics/companies',
+    signupRequests: '/admin/signup-requests',
+    approveSignup: (requestId: string) => `/admin/signup-requests/${segment(requestId)}/approve`,
+    rejectSignup: (requestId: string) => `/admin/signup-requests/${segment(requestId)}/reject`,
     plans: '/admin/plans',
     usage: '/admin/usage',
     analyticsSummary: '/admin/analytics/summary',

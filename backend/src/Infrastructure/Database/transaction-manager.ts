@@ -2,6 +2,7 @@ import type { Repositories, TransactionManager } from '../../Application/Common/
 import { PostgresAccountRepository } from '../Repositories/PostgresAccountRepository';
 import { PostgresPlanRepository } from '../Repositories/PostgresPlanRepository';
 import { PostgresQuotaRepository } from '../Repositories/PostgresQuotaRepository';
+import { PostgresSignupRequestRepository } from '../Repositories/PostgresSignupRequestRepository';
 import { PostgresUsageRepository } from '../Repositories/PostgresUsageRepository';
 import { PostgresUserRepository } from '../Repositories/PostgresUserRepository';
 import { PG_ERROR, pgErrorCode, type Pool, type Queryable } from './postgres';
@@ -13,6 +14,7 @@ export function createRepositories(db: Queryable): Repositories {
     plans: new PostgresPlanRepository(db),
     quotas: new PostgresQuotaRepository(db),
     usage: new PostgresUsageRepository(db),
+    signupRequests: new PostgresSignupRequestRepository(db),
   };
 }
 

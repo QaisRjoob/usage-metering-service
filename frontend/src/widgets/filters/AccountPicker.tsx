@@ -71,7 +71,7 @@ export function AccountPicker({ value, onChange, label = 'Account' }: { value: s
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && (
-        <ul id={`${id}-list`} role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg">
+        <ul id={`${id}-list`} role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-surface py-1 text-sm shadow-lg">
           {options.data?.items.length === 0 && <li className="px-3 py-2 text-slate-500">No accounts match</li>}
           {!options.data && <li className="px-3 py-2 text-slate-500">Loading…</li>}
           {options.data?.items.map((account) => (

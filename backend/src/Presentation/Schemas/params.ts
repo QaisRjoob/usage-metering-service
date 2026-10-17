@@ -8,6 +8,7 @@ export const accountIdParams = z.object({ accountId: idSchema });
 export const userIdParams = z.object({ userId: externalUserIdSchema });
 export const planIdParams = z.object({ planId: idSchema });
 export const usageIdParams = z.object({ usageId: idSchema });
+export const signupRequestParams = z.object({ requestId: idSchema });
 export const monthQuery = z.object({ month: monthSchema.optional() });
 
 /** The account resolved from the API key by the preHandler. */

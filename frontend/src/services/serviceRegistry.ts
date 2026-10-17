@@ -14,6 +14,8 @@ import { createMockQuotaService } from './mock/mockQuotaService';
 import { createMockUsageService } from './mock/mockUsageService';
 import { createMockUserService } from './mock/mockUserService';
 import { createHttpPlanService, type PlanService } from './planService';
+import { createHttpSignupService, type SignupService } from './signupService';
+import { createMockSignupService } from './mock/mockSignupService';
 import { createHttpQuotaService, type QuotaService } from './quotaService';
 import { createHttpUsageService, type UsageService } from './usageService';
 import { createHttpUserService, type UserService } from './userService';
@@ -22,6 +24,7 @@ import { createHttpUserService, type UserService } from './userService';
 export interface Services {
   dataSource: DataSource;
   auth: AuthService;
+  signup: SignupService;
   accounts: AccountService;
   directory: DirectoryService;
   users: UserService;
@@ -37,6 +40,7 @@ export function createServices(dataSource: DataSource = apiConfig.dataSource): S
     return {
       dataSource,
       auth: createMockAuthService(),
+      signup: createMockSignupService(),
       accounts: createMockAccountService(),
       directory: createMockDirectoryService(),
       users: createMockUserService(),
@@ -50,6 +54,7 @@ export function createServices(dataSource: DataSource = apiConfig.dataSource): S
   return {
     dataSource,
     auth: createHttpAuthService(),
+    signup: createHttpSignupService(),
     accounts: createHttpAccountService(),
     directory: createHttpDirectoryService(),
     users: createHttpUserService(),

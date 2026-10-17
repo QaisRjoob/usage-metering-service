@@ -59,7 +59,7 @@ export default function AccountDetailsView() {
         }
         actions={<MonthSelect value={vm.month} onChange={(month) => vm.list.set({ month })} />}
       />
-      <p className="mb-6 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+      <p className="mb-6 flex items-center gap-2 rounded-xl border border-slate-200 bg-surface px-4 py-3 text-sm text-slate-600">
         <Eye className="size-4 text-slate-400" aria-hidden="true" />
         Read-only operator view. The company registers users and changes plans in its own account portal.
       </p>

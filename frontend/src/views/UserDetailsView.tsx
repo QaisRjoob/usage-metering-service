@@ -136,7 +136,7 @@ function UserDetailsPage({ scope }: { scope: Scope }) {
         }
         actions={<MonthSelect value={month} onChange={(value) => setParams({ month: value, page: null })} />}
       />
-      <p className="mb-6 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+      <p className="mb-6 flex items-center gap-2 rounded-xl border border-slate-200 bg-surface px-4 py-3 text-sm text-slate-600">
         <Eye className="size-4 text-slate-400" aria-hidden="true" />
         {scope === 'operator'
           ? 'Read-only operator view. A request needs both this user’s plan and the company’s shared plan to allow it.'

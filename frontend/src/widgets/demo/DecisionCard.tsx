@@ -38,7 +38,7 @@ export function DecisionCard({ accepted, rejection, violations, units, userId, r
         )}
       </div>
       {rejection && (
-        <div className="mt-3 rounded-lg bg-white/70 p-3 text-sm">
+        <div className="mt-3 rounded-lg bg-surface/70 p-3 text-sm">
           <p className="font-medium text-rose-900">
             {RULE_LABELS[rejection.rule]} <span className="font-mono text-xs">({rejection.rule})</span>
           </p>

@@ -26,6 +26,7 @@ import { AssignUserPlanCommand } from './Application/Modules/Users/Commands/Assi
 import { RegisterUserCommand } from './Application/Modules/Users/Commands/RegisterUserCommand';
 import { GetUserQuery } from './Application/Modules/Users/Queries/GetUserQuery';
 import { ListUsersQuery } from './Application/Modules/Users/Queries/ListUsersQuery';
+import { ApproveSignupCommand, ClaimSignupCommand, GetSignupStatusQuery, ListSignupRequestsQuery, RejectSignupCommand, SubmitSignupRequestCommand } from './Application/Modules/Signup/SignupUseCases';
 import type { AppConfig } from './config/env';
 import { safeEqual } from './Shared/Middleware/auth';
 import type { Pool } from './Infrastructure/Database/postgres';
@@ -89,6 +90,14 @@ export function createContainer(options: ContainerOptions) {
       accountSummary: new GetAdminAccountUsageSummaryQuery(accountUsageSummary, repos.usage, clock),
       userOverview: new GetAdminUserOverviewQuery(userUsageSummary, repos.accounts, repos.plans, repos.usage, clock),
       companyStats: new GetCompanyStatsQuery(analytics, clock),
+    },
+    signup: {
+      submit: new SubmitSignupRequestCommand(repos.signupRequests, repos.plans, clock),
+      status: new GetSignupStatusQuery(repos.signupRequests),
+      claim: new ClaimSignupCommand(transactions, clock),
+      list: new ListSignupRequestsQuery(repos.signupRequests),
+      approve: new ApproveSignupCommand(transactions, clock),
+      reject: new RejectSignupCommand(transactions, clock),
     },
     plans: {
       create: new CreatePlanCommand(repos.plans, clock),

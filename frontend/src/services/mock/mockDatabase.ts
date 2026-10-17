@@ -31,6 +31,7 @@ import {
   type RequestCounts,
   type RuleLevel,
   type RuleViolation,
+  type SignupStatus,
   type UsageOutcome,
   type UsageRecord,
   type UserSummary,
@@ -97,6 +98,23 @@ export interface RequestRow {
   replayCount: number;
 }
 
+/** A self-service sign-up request (the mock keeps the claim code itself; the API stores its hash). */
+export interface SignupRow {
+  id: string;
+  companyName: string;
+  contactName: string;
+  contactEmail: string;
+  useCase: string | null;
+  requestedPlanId: string;
+  claimCode: string;
+  status: SignupStatus;
+  decisionNote: string | null;
+  accountId: string | null;
+  submittedAt: string;
+  decidedAt: string | null;
+  claimedAt: string | null;
+}
+
 export interface UsageFilter {
   accountId?: string;
   externalUserId?: string;
@@ -137,6 +155,7 @@ export class MockDatabase {
   readonly versions = new Map<string, PlanVersionRow>();
   readonly accounts = new Map<string, AccountRow>();
   readonly users = new Map<string, UserRow>();
+  readonly signupRequests = new Map<string, SignupRow>();
   /** Chronological order (oldest first). */
   readonly requests: RequestRow[] = [];
   /** Idempotency index: UNIQUE (account_id, request_id). */

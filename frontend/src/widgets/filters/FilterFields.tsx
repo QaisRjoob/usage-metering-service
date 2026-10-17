@@ -15,7 +15,7 @@ export function SegmentedFilter<T extends string>({
   onChange: (value: T | '') => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-white p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-surface p-0.5">
       {options.map((option) => (
         <button
           key={option.value || 'all'}
@@ -23,7 +23,7 @@ export function SegmentedFilter<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
-          className={cn('rounded-md px-3 py-1.5 text-xs font-medium', value === option.value ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100')}
+          className={cn('rounded-md px-3 py-1.5 text-xs font-medium', value === option.value ? 'bg-solid-brand text-white' : 'text-slate-600 hover:bg-slate-100')}
         >
           {option.label}
         </button>

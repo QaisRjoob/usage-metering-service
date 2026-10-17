@@ -45,7 +45,7 @@ export function FilterBar({ search, quick, advanced, advancedActiveCount = 0, ch
           <Button variant={open ? 'secondary' : 'outline'} size="sm" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls={panelId}>
             <SlidersHorizontal className="size-3.5" aria-hidden="true" />
             More filters
-            {advancedActiveCount > 0 && <span className="rounded-full bg-brand-600 px-1.5 text-[10px] text-white">{advancedActiveCount}</span>}
+            {advancedActiveCount > 0 && <span className="rounded-full bg-solid-brand px-1.5 text-[10px] text-white">{advancedActiveCount}</span>}
             <ChevronDown className={cn('size-3.5 transition-transform', open && 'rotate-180')} aria-hidden="true" />
           </Button>
         )}

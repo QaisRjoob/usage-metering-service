@@ -49,6 +49,8 @@ export interface AccountRepository {
   findById(accountId: string): Promise<Account | null>;
   create(input: { name: string; apiKeyHash: string; apiKeyPrefix: string; planId: string; createdAt: Date }): Promise<Account>;
   updatePlan(accountId: string, planId: string, updatedAt: Date): Promise<void>;
+  /** Replaces the account's API key (only its hash and display prefix are stored). */
+  updateApiKey(accountId: string, apiKeyHash: string, apiKeyPrefix: string, updatedAt: Date): Promise<void>;
   getQuotaRow(accountId: string, period: QuotaPeriod): Promise<AccountQuotaRow | null>;
   list(filter: AccountListFilter, window: PageWindow): Promise<{ rows: AccountQuotaRow[]; total: number }>;
   /** Category counts (status, plan, activity) within `search`. */

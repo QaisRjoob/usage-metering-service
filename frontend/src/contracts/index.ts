@@ -12,3 +12,4 @@ export * from './ai';
 export * from './seed';
 export * from './auth';
 export * from './admin';
+export * from './signup';

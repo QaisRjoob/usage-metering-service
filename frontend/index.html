@@ -6,6 +6,15 @@
     <meta name="description" content="Usage Metering & Quota Service - operator dashboard and example client" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M8 22V10h4v12zm6 0V14h4v8zm6 0v-5h4v5z' fill='white'/></svg>" />
     <title>Usage Metering</title>
+    <script>
+      // Apply the saved (or system) theme before the first paint; ThemeProvider takes over after.
+      (function () {
+        var theme = null;
+        try { theme = localStorage.getItem("umk-theme"); } catch (e) {}
+        if (theme !== "light" && theme !== "dark") theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

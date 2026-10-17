@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router';
-import { BarChart3, Bot, Building2, FileClock, Gauge, LayoutDashboard, Layers, PlayCircle, Users, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { BarChart3, Bot, Building2, FileClock, Gauge, Inbox, LayoutDashboard, Layers, PlayCircle, Users, X } from 'lucide-react';
+import { useServices } from '@/providers/ServicesProvider';
+import { queryKeys } from '@/utils/queryKeys';
 import { routePaths } from '@/routing/routePaths';
 import { Header } from './Header';
 import { PageContainer } from './PageContainer';
@@ -12,6 +15,7 @@ const operatorNav: NavSection[] = [
     title: 'Administration',
     items: [
       { to: routePaths.operator.root, label: 'Overview', icon: LayoutDashboard, end: true },
+      { to: routePaths.operator.requests, label: 'Access requests', icon: Inbox },
       { to: routePaths.operator.accounts, label: 'Accounts', icon: Building2 },
       { to: routePaths.operator.users, label: 'Users directory', icon: Users },
       { to: routePaths.operator.plans, label: 'Plan catalogue', icon: Layers },
@@ -51,7 +55,7 @@ const accountNav: NavSection[] = [
 function Brand({ subtitle }: { subtitle: string }) {
   return (
     <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-5">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
+      <span className="flex size-8 items-center justify-center rounded-lg bg-solid-brand text-white">
         <BarChart3 className="size-4" aria-hidden="true" />
       </span>
       <div className="leading-tight">
@@ -66,17 +70,17 @@ function Layout({ sections, subtitle }: { sections: NavSection[]; subtitle: stri
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="min-h-screen lg:pl-60">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">
         Skip to content
       </a>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-slate-200 bg-white lg:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-slate-200 bg-surface lg:block">
         <Brand subtitle={subtitle} />
         <Sidebar sections={sections} />
       </aside>
       {menuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setMenuOpen(false)} aria-hidden="true" />
-          <aside className="relative h-full w-64 bg-white shadow-xl">
+          <aside className="relative h-full w-64 bg-surface shadow-xl">
             <button type="button" className="absolute right-2 top-3 rounded-md p-2 text-slate-500 hover:bg-slate-100" onClick={() => setMenuOpen(false)} aria-label="Close navigation">
               <X className="size-5" aria-hidden="true" />
             </button>
@@ -95,8 +99,18 @@ function Layout({ sections, subtitle }: { sections: NavSection[]; subtitle: stri
   );
 }
 
+/** Pending sign-up requests, for the badge on "Access requests" (refreshed every minute). */
+const PENDING_PARAMS = { status: 'pending' as const, page: 1, pageSize: 1 };
+
 export function OperatorLayout() {
-  return <Layout sections={operatorNav} subtitle="Operator console" />;
+  const { signup } = useServices();
+  const pending = useQuery({ queryKey: queryKeys.admin.signupRequests(PENDING_PARAMS), queryFn: () => signup.list(PENDING_PARAMS), refetchInterval: 60_000 });
+  const count = pending.data?.counts.pending ?? 0;
+  const sections = operatorNav.map((section) => ({
+    ...section,
+    items: section.items.map((item) => (item.to === routePaths.operator.requests ? { ...item, badge: count } : item)),
+  }));
+  return <Layout sections={sections} subtitle="Operator console" />;
 }
 
 export function AccountLayout() {

@@ -8,7 +8,7 @@ export function CardsSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" role="status" aria-label="Loading">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="rounded-xl border border-slate-200 bg-white p-5">
+        <div key={index} className="rounded-xl border border-slate-200 bg-surface p-5">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="mt-3 h-7 w-32" />
           <Skeleton className="mt-3 h-2 w-full" />
@@ -47,7 +47,7 @@ export function PageSkeleton() {
     <div className="space-y-6" role="status" aria-label="Loading page">
       <Skeleton className="h-8 w-56" />
       <CardsSkeleton />
-      <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="rounded-xl border border-slate-200 bg-surface">
         <TableSkeleton />
       </div>
     </div>

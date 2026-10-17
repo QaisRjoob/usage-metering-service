@@ -57,7 +57,7 @@ export function ProcessDocumentPanel({ users, userId, onUserChange, units, onUni
               onClick={() => onUnitsChange(String(type.units))}
               className={cn(
                 'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm',
-                parsedUnits === type.units ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white hover:bg-slate-50',
+                parsedUnits === type.units ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-200 bg-surface hover:bg-slate-50',
               )}
             >
               <FileText className="size-4 shrink-0" aria-hidden="true" />

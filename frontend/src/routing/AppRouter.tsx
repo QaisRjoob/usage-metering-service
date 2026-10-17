@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router';
 import { PageSkeleton } from '@/widgets/common/LoadingSkeleton';
 import { AccountLayout, OperatorLayout } from '@/widgets/layout/AppLayout';
 import {
+  AccessRequestsView,
   AccountAiAdvisorView,
   AccountDetailsView,
   AccountOverviewView,
@@ -20,6 +21,8 @@ import {
   OperatorUsersView,
   OperatorUsageHistoryView,
   PlansView,
+  SignupStatusView,
+  SignupView,
   QuotasView,
   UsersView,
 } from './routeLoaders';
@@ -33,6 +36,8 @@ export function AppRouter() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path={routePaths.login} element={<Lazy view={<LoginView />} />} />
+      <Route path={routePaths.signup} element={<Lazy view={<SignupView />} />} />
+      <Route path={routePaths.signupStatus} element={<Lazy view={<SignupStatusView />} />} />
 
       <Route
         element={
@@ -42,6 +47,7 @@ export function AppRouter() {
         }
       >
         <Route path={op.root} element={<Lazy view={<DashboardView />} />} />
+        <Route path={op.requests} element={<Lazy view={<AccessRequestsView />} />} />
         <Route path={op.accounts} element={<Lazy view={<AccountsView />} />} />
         <Route path={op.accountDetails} element={<Lazy view={<AccountDetailsView />} />} />
         <Route path={op.userDetails} element={<Lazy view={<OperatorUserDetailsView />} />} />

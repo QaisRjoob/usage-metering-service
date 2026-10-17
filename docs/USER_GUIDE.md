@@ -100,8 +100,24 @@ token and opens the right interface:
 For the local demo there is a **Use demo company key** button. An unknown token is refused with one
 message ("This is neither a valid API key nor the operator token") and nothing is stored.
 
-The header always shows who you are (the company name, or *Operator*) and a **Sign out** button.
-Signing in with one role signs you out of the other. Credentials are kept only in this browser tab.
+The header always shows who you are (the company name, or *Operator*), the **theme switch** (moon /
+sun: light or dark, remembered in this browser) and a **Sign out** button. Signing in with one role
+signs you out of the other. Credentials are kept only in this browser tab.
+
+### New company? Request access
+
+1. On the login page click **Request access**.
+2. Fill in your company name, your name, your work email, the plan you want (Starter or Pro) and,
+   optionally, what you will use it for. Press **Send request**.
+3. You get a **Request ID** and a **Claim code**. Copy both and keep the claim code safe: it is
+   shown only once and works like a password.
+4. Press **Check my request** (or later: login page → **Check a request**, and enter both values).
+   The page shows the progress: *Request sent* → *Waiting for the operator* → *Approved* or *Denied*
+   (with the operator's message). Press **Refresh** to check again.
+5. Once approved, press **Get my API key**. Copy the key (shown once), then **Open my portal**.
+
+Try it locally: send a request, sign in as the operator in another browser (or after signing out),
+approve it on **Access requests**, then come back to **Check a request**.
 
 ---
 
@@ -192,6 +208,7 @@ Sign out, then sign in with the operator token `local-admin-token-change-me`.
 | Page | What you can do |
 |---|---|
 | **Overview** | Totals for the chosen month across all companies: units consumed, allocated units, overall utilization, companies at ≥ 80 %, daily trend, most-used companies, recent activity and six-month totals. |
+| **Access requests** | Companies that asked for an account. Tabs with counts: Waiting, Approved, Denied, All; search by company, contact or email; sort by company, date sent or decision date. **Approve** lets you pick the plan and add a message, then creates the account; **Deny** asks for a reason the company will read. Approved rows show whether the company has collected its key and link to the new account. The menu item shows how many requests are waiting. |
 | **Accounts** | Every company with plan (and units left), users, usage, utilization, status, this month's requests (accepted / rejected) and the time of the last request. **Search** finds a company by its name, its account id, its API key prefix (`umk_live_…`) or by one of its users (user id or display name). **Browse by category**: tabs with live counts for quota status, activity this month (active / no requests) and plan — click one to filter. **More filters**: plan type (predefined/custom), rejections this month, number of users, utilization range, creation date range, month. Sort by name, users, usage, utilization, rejections, last request or creation date. **Create account** issues a new API key — it is **shown only once**; copy it and give it to the company. Click a company to open its details. |
 | **Account details** | Read-only view of one company for the chosen month: its shared quota, **company statistics** (accepted and rejected requests, units refused, rejection rate, users close to their limits, units left, last request), why requests were rejected (each chip opens the filtered history), a **daily usage** chart and the **last six months** of this company. Below: its users with the same category tabs (status, activity, plan) with counts, request and last-request columns and the same filters as the company's own Users page — click a user, or **Details**, to open that user — and recent requests. Changes to users and plans are made by the company in its own portal. |
 | **User details** | One user of a company: their own quota and the company's shared quota, statistics for the month (accepted, rejected, rejection rate, last request), rejection reasons, daily usage, the last six months, and their **request history** page by page (request id, units, outcome, rule, plan versions, retries). Change the month at the top right. Reached from a company's users, from the Users directory, or from the finder. |

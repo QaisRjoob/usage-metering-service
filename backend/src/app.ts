@@ -14,6 +14,7 @@ import { registerAuthRoutes } from './Presentation/Routes/auth.routes';
 import { registerHealthRoutes } from './Presentation/Routes/health.routes';
 import { registerPlanRoutes } from './Presentation/Routes/plans.routes';
 import { registerQuotaRoutes } from './Presentation/Routes/quotas.routes';
+import { registerSignupRoutes } from './Presentation/Routes/signup.routes';
 import { registerUsageRoutes } from './Presentation/Routes/usage.routes';
 import { registerUserRoutes } from './Presentation/Routes/users.routes';
 import { requireApiKey } from './Shared/Middleware/auth';
@@ -70,6 +71,7 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
       registerAdminRoutes(api, container);
       registerAiRoutes(api, container);
       registerAuthRoutes(api, container);
+      registerSignupRoutes(api, container);
       // Account scope: every route below requires X-API-Key.
       await api.register(async (accountScope) => {
         accountScope.addHook('preHandler', requireApiKey((key) => container.accounts.authenticate.execute(key)));

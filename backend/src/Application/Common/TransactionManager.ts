@@ -1,6 +1,7 @@
 import type { AccountRepository } from '../Modules/Accounts/Interfaces/AccountRepository';
 import type { PlanRepository } from '../Modules/Plans/Interfaces/PlanRepository';
 import type { QuotaRepository } from '../Modules/Quotas/Interfaces/QuotaRepository';
+import type { SignupRequestRepository } from '../Modules/Signup/Interfaces/SignupRequestRepository';
 import type { UsageRepository } from '../Modules/Usage/Interfaces/UsageRepository';
 import type { UserRepository } from '../Modules/Users/Interfaces/UserRepository';
 
@@ -11,6 +12,7 @@ export interface Repositories {
   plans: PlanRepository;
   quotas: QuotaRepository;
   usage: UsageRepository;
+  signupRequests: SignupRequestRepository;
 }
 
 /**

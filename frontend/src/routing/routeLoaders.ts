@@ -5,6 +5,8 @@ import { lazy } from 'react';
  * bundles only; API pagination is handled separately by the services.
  */
 export const LoginView = lazy(() => import('@/views/LoginView'));
+export const SignupView = lazy(() => import('@/views/SignupView'));
+export const SignupStatusView = lazy(() => import('@/views/SignupStatusView'));
 
 // Operator interface (/admin)
 export const DashboardView = lazy(() => import('@/views/DashboardView'));
@@ -12,6 +14,7 @@ export const AccountsView = lazy(() => import('@/views/AccountsView'));
 export const AccountDetailsView = lazy(() => import('@/views/AccountDetailsView'));
 export const OperatorUserDetailsView = lazy(() => import('@/views/UserDetailsView').then((module) => ({ default: module.OperatorUserDetailsView })));
 export const CompanyStatsView = lazy(() => import('@/views/CompanyStatsView'));
+export const AccessRequestsView = lazy(() => import('@/views/AccessRequestsView'));
 export const OperatorUsersView = lazy(() => import('@/views/OperatorUsersView'));
 export const OperatorPlansView = lazy(() => import('@/views/OperatorPlansView'));
 export const OperatorUsageHistoryView = lazy(() => import('@/views/UsageHistoryView').then((module) => ({ default: module.OperatorUsageHistoryView })));

@@ -119,6 +119,10 @@ export class PostgresAccountRepository implements AccountRepository {
     await this.db.query('UPDATE accounts SET plan_id = $2, updated_at = $3 WHERE id = $1', [accountId, planId, updatedAt]);
   }
 
+  async updateApiKey(accountId: string, apiKeyHash: string, apiKeyPrefix: string, updatedAt: Date): Promise<void> {
+    await this.db.query('UPDATE accounts SET api_key_hash = $2, api_key_prefix = $3, updated_at = $4 WHERE id = $1', [accountId, apiKeyHash, apiKeyPrefix, updatedAt]);
+  }
+
   async getQuotaRow(accountId: string, period: QuotaPeriod): Promise<AccountQuotaRow | null> {
     const { rows } = await this.db.query<AccountQuotaColumns>(`${QUOTA_SELECT} WHERE a.id = $2`, [periodToDate(period), accountId]);
     return rows[0] ? toQuotaRow(rows[0]) : null;

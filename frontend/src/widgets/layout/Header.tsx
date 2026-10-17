@@ -5,6 +5,7 @@ import { routePaths } from '@/routing/routePaths';
 import { isMockMode } from '@/services/api/apiConfig';
 import { credentials, roleOf } from '@/services/api/credentials';
 import { Badge } from '@/widgets/ui/Badge';
+import { ThemeToggle } from '@/widgets/ui/ThemeToggle';
 import { OperatorFinder } from './OperatorFinder';
 import { Button } from '@/widgets/ui/Button';
 
@@ -20,7 +21,7 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-surface/90 px-4 backdrop-blur sm:px-6">
       <button type="button" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={onOpenMenu} aria-label="Open navigation">
         <Menu className="size-5" aria-hidden="true" />
       </button>
@@ -47,6 +48,7 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
             <span className="truncate font-medium">{session.account.accountName}</span>
           </span>
         )}
+        <ThemeToggle />
         <Button variant="outline" size="sm" onClick={signOut}>
           <LogOut className="size-3.5" aria-hidden="true" /> Sign out
         </Button>

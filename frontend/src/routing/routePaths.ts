@@ -5,12 +5,15 @@
  */
 export const routePaths = {
   login: '/login',
+  signup: '/signup',
+  signupStatus: '/signup/status',
   operator: {
     root: '/admin',
     accounts: '/admin/accounts',
     accountDetails: '/admin/accounts/:accountId',
     userDetails: '/admin/accounts/:accountId/users/:userId',
     companies: '/admin/companies',
+    requests: '/admin/requests',
     users: '/admin/users',
     plans: '/admin/plans',
     usage: '/admin/usage',

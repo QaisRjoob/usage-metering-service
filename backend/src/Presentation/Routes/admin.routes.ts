@@ -3,11 +3,14 @@ import {
   adminListPlansQuerySchema,
   adminListUsageQuerySchema,
   adminListUsersQuerySchema,
+  adminListSignupRequestsQuerySchema,
   adminSearchQuerySchema,
+  approveSignupSchema,
   companyStatsQuerySchema,
   createAccountSchema,
   listAccountsQuerySchema,
   listUsersQuerySchema,
+  rejectSignupSchema,
   userFacetsQuerySchema,
 } from '../../contracts';
 import type { FastifyInstance } from 'fastify';
@@ -15,7 +18,7 @@ import type { Container } from '../../container';
 import { accountNotFound } from '../../Domain/Accounts/AccountErrors';
 import { requireAdmin } from '../../Shared/Middleware/auth';
 import { validate } from '../../Shared/Validation/validate';
-import { accountIdParams, monthQuery, userIdParams } from '../Schemas/params';
+import { accountIdParams, monthQuery, signupRequestParams, userIdParams } from '../Schemas/params';
 
 /**
  * Operator endpoints (Authorization: Bearer ADMIN_API_TOKEN). They read across accounts but do not
@@ -67,6 +70,22 @@ export function registerAdminRoutes(app: FastifyInstance, container: Container):
     });
 
     admin.get('/admin/analytics/companies', async (request) => container.directory.companyStats.execute(validate(companyStatsQuerySchema, request.query)));
+
+    admin.get('/admin/signup-requests', async (request) => container.signup.list.execute(validate(adminListSignupRequestsQuerySchema, request.query)));
+
+    admin.post('/admin/signup-requests/:requestId/approve', async (request) => {
+      const { requestId } = validate(signupRequestParams, request.params);
+      const result = await container.signup.approve.execute(requestId, validate(approveSignupSchema, request.body ?? {}));
+      request.log.info({ signupRequestId: requestId, accountId: result.account?.id }, 'sign-up request approved');
+      return result;
+    });
+
+    admin.post('/admin/signup-requests/:requestId/reject', async (request) => {
+      const { requestId } = validate(signupRequestParams, request.params);
+      const result = await container.signup.reject.execute(requestId, validate(rejectSignupSchema, request.body).note);
+      request.log.info({ signupRequestId: requestId }, 'sign-up request rejected');
+      return result;
+    });
 
     admin.get('/admin/plans', async (request) => container.plans.listAll.execute(validate(adminListPlansQuerySchema, request.query)));
 

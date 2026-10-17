@@ -12,7 +12,7 @@ export function MonthSelect({ value, onChange, className, label = 'Month (UTC)' 
       <label htmlFor={id} className="whitespace-nowrap text-xs font-medium text-slate-600">
         {label}
       </label>
-      <select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm shadow-sm">
+      <select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm shadow-sm">
         {months.map((month) => (
           <option key={month} value={month}>
             {formatMonthLabel(month)}

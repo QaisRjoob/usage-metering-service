@@ -108,10 +108,10 @@ export function OperatorFinder() {
             setOpen(false);
           }
         }}
-        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-8 text-sm placeholder:text-slate-400 focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100 focus:outline-none"
+        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-8 text-sm placeholder:text-slate-400 focus:border-brand-400 focus:bg-surface focus:ring-2 focus:ring-brand-100 focus:outline-none"
       />
       {showList && (
-        <ul id={listId} role="listbox" aria-label="Search results" className="absolute top-full right-0 left-0 z-40 mt-1 max-h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+        <ul id={listId} role="listbox" aria-label="Search results" className="absolute top-full right-0 left-0 z-40 mt-1 max-h-96 overflow-y-auto rounded-lg border border-slate-200 bg-surface py-1 shadow-lg">
           {options.length === 0 ? (
             <li className="px-3 py-2 text-sm text-slate-500">{results.isFetching ? 'Searching…' : 'No company or user matches.'}</li>
           ) : (

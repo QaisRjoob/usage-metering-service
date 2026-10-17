@@ -73,12 +73,24 @@ gets its own interface (own layout, menu and URL space); the other role's pages 
 
 | Interface | URL | Pages |
 |---|---|---|
-| Operator console | `/admin` | Overview (dashboard), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only company statistics: requests, rejection rate, daily chart, 6-month trend, users you can open), user details (one user's quotas, statistics, trends and request history), Company statistics (every company's usage, share, requests, rejection rate and active users, with totals), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
+| Public | `/login`, `/signup`, `/signup/status` | Sign in; request access (company sign-up); follow a request and collect the API key once approved |
+| Operator console | `/admin` | Overview (dashboard), Access requests (approve or deny sign-ups; a badge counts the waiting ones), Accounts (category tabs with counts, search by name / id / key prefix / user id), account details (read-only company statistics: requests, rejection rate, daily chart, 6-month trend, users you can open), user details (one user's quotas, statistics, trends and request history), Company statistics (every company's usage, share, requests, rejection rate and active users, with totals), Users directory (end users of every company), Plan catalogue, Usage history across accounts, AI Advisor (all accounts); a header finder jumps to any company or user |
 | Account portal | `/app` | Overview, Users (category tabs with counts, activity columns, filters), user details (one user's quotas, statistics, trends and request history), Plans, Quotas, Usage history, Client Demo, AI Advisor (own data) |
 
 Only one role is signed in at a time (signing in as one signs you out of the other), and the API
 enforces the same split independently: the admin token does not open account endpoints and an API
 key does not open `/admin`. Credentials stay in the browser tab only (sessionStorage).
+
+**Light / dark theme:** the moon / sun button (top right on every page) switches the theme; the
+choice is remembered in the browser (localStorage) and the system preference is used until then.
+
+**Self-service sign-up:** a company fills in `/signup` (company, contact, email, plan, use case)
+and receives a **request id** and a **claim code** (shown once, stored only as a SHA-256 hash). The
+operator approves (the account is created in the same transaction) or denies with a reason on
+**Access requests**. The company follows its request on `/signup/status` and, once approved,
+collects its API key there exactly once (the key is issued at claim time; only its hash is stored).
+No email is sent; the claim code is the applicant's proof. One open request per email; submitting is
+rate-limited per IP (`SIGNUP_RATE_LIMIT_PER_MINUTE`, default 10).
 
 Start again from a clean state with `docker compose down -v && docker compose up --build`.
 

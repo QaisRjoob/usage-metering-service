@@ -1,3 +1,4 @@
+import type { AdminListSignupRequestsParams } from '@/contracts';
 import type { ListAccountsParams } from '@/models/account';
 import type { AccountFacetsParams, AdminListUsersParams, CompanyStatsParams, UserFacetsParams } from '@/models/directory';
 import type { AdminListPlansParams, ListPlansParams } from '@/models/plan';
@@ -22,6 +23,7 @@ export const queryKeys = {
     accountSummary: (accountId: string, month: string) => ['admin', 'account', accountId, 'summary', month] as const,
     userOverview: (accountId: string, userId: string, month: string) => ['admin', 'account', accountId, 'user', userId, month] as const,
     companyStats: (params: CompanyStatsParams) => ['admin', 'companies', params] as const,
+    signupRequests: (params: AdminListSignupRequestsParams) => ['admin', 'signup-requests', params] as const,
     account: (accountId: string, month: string) => ['admin', 'account', accountId, month] as const,
     accountUsers: (accountId: string, params: ListUsersParams) => ['admin', 'account', accountId, 'users', params] as const,
     usage: (params: AdminListUsageParams) => ['admin', 'usage', params] as const,

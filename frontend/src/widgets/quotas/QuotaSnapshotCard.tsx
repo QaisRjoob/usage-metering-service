@@ -10,7 +10,7 @@ import { QuotaStatusBadge } from './QuotaStatusBadge';
 export function QuotaSnapshotCard({ quota, title, className, highlight = false }: { quota: QuotaSnapshot; title?: string; className?: string; highlight?: boolean }) {
   const Icon = quota.level === 'account' ? Building2 : User;
   return (
-    <div className={cn('rounded-xl border bg-white p-4', highlight ? 'border-rose-300 ring-2 ring-rose-100' : 'border-slate-200', className)}>
+    <div className={cn('rounded-xl border bg-surface p-4', highlight ? 'border-rose-300 ring-2 ring-rose-100' : 'border-slate-200', className)}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Icon className="size-4 shrink-0 text-slate-400" aria-hidden="true" />

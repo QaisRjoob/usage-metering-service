@@ -39,8 +39,8 @@ Every non-2xx response has this body:
 | 400 | `VALIDATION_ERROR` (`details` = `[{ path, message }]`) |
 | 401 | `API_KEY_MISSING`, `API_KEY_INVALID`, `ADMIN_TOKEN_MISSING`, `ADMIN_TOKEN_INVALID`, `CREDENTIAL_INVALID` (login) |
 | 403 | `PLAN_READ_ONLY` (predefined plans cannot be edited) |
-| 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `USER_NOT_FOUND`, `PLAN_NOT_FOUND`, `USAGE_RECORD_NOT_FOUND` |
-| 409 | `USER_ALREADY_EXISTS`, `PLAN_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED` |
+| 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `USER_NOT_FOUND`, `PLAN_NOT_FOUND`, `USAGE_RECORD_NOT_FOUND`, `SIGNUP_REQUEST_NOT_FOUND` (also a wrong claim code) |
+| 409 | `USER_ALREADY_EXISTS`, `PLAN_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `SIGNUP_ALREADY_PENDING`, `SIGNUP_ALREADY_DECIDED`, `SIGNUP_NOT_APPROVED`, `SIGNUP_ALREADY_CLAIMED` |
 | 422 | `PLAN_SCOPE_MISMATCH` (user plan on an account or vice versa) |
 | 429 | `RATE_LIMITED` |
 | 502 / 503 / 500 | `AI_PROVIDER_ERROR`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR` |
@@ -108,6 +108,15 @@ Rule evaluation order (first failure is `rejection`; all failures are in `violat
 The login page uses it to open the right interface from one field. It does not create a session or
 cookie: the client then sends the token as `Authorization: Bearer` (operator) or `X-API-Key` (account).
 
+### Self-service sign-up (no credential header)
+| Method | Path | Request | Response |
+|---|---|---|---|
+| POST | `/signup-requests` | `{ companyName, contactName, contactEmail, planId?, useCase? }` (`planId`: a predefined account plan, default Starter) | `201 { requestId, claimCode, status: "pending", submittedAt }` — the claim code is shown once. Same email with an open request → `409 SIGNUP_ALREADY_PENDING`. Rate-limited per IP (SIGNUP_RATE_LIMIT_PER_MINUTE, default 10). |
+| POST | `/signup-requests/status` | `{ requestId, claimCode }` | `SignupRequestStatus { requestId, companyName, contactName, requestedPlanName, status, submittedAt, decidedAt, decisionNote, claimed }`; unknown id or wrong code → `404 SIGNUP_REQUEST_NOT_FOUND` (same answer) |
+| POST | `/signup-requests/claim` | `{ requestId, claimCode }` | `ClaimSignupResponse { account, apiKey }` — once; before approval or after a denial → `409 SIGNUP_NOT_APPROVED`, again → `409 SIGNUP_ALREADY_CLAIMED` |
+
+The claim code travels in the JSON body, never in the URL. Status and claim share the login rate limit.
+
 ### Operator (admin token)
 | Method | Path | Request | Response |
 |---|---|---|---|
@@ -122,6 +131,9 @@ cookie: the client then sends the token as `Authorization: Bearer` (operator) or
 | GET | `/admin/users` | `page, pageSize, search?` (user id, display name, internal id), `accountId?, planId?, status?, activity?, minUtilization?, maxUtilization?, createdFrom?, createdTo?, month?, sort=externalUserId\|accountName\|createdAt\|utilization\|consumed\|lastActivity\|rejected` (default `lastActivity desc`), `order` | `Paginated<AdminUserListItem>` (user + quota + `account { id, name }` + `activity`) |
 | GET | `/admin/users/facets` | `search?, accountId?, month?` | `UserFacets` (same shape as `AccountFacets`) |
 | GET | `/admin/search` | `q` (1–100 chars) | `AdminSearchResult { accounts[] (≤ 6), users[] (≤ 6) }`, exact id / key-prefix matches first |
+| GET | `/admin/signup-requests` | `page, pageSize, search?` (company, contact, email), `status?=pending\|approved\|rejected, sort=submittedAt\|companyName\|decidedAt, order` | `AdminSignupRequestPage` = `Paginated<AdminSignupRequest>` + `counts { pending, approved, rejected, total }` |
+| POST | `/admin/signup-requests/:requestId/approve` | `{ planId?, note? }` | `AdminSignupRequest` — creates the account (same transaction); already decided → `409 SIGNUP_ALREADY_DECIDED` |
+| POST | `/admin/signup-requests/:requestId/reject` | `{ note }` (3–500 chars, shown to the applicant) | `AdminSignupRequest` |
 | GET | `/admin/plans` | `page, pageSize, search?, scope?, kind?, ownerAccountId?, sort?, order?` | `Paginated<AdminPlanListItem>` (plan + `ownerAccountName`, `assignedAccounts`, `assignedUsers`) |
 | GET | `/admin/usage` | same query as `GET /usage`, plus `accountId?` | `Paginated<UsageRecord>` |
 | GET | `/admin/analytics/summary` | `month` | `AdminAnalyticsSummary` |

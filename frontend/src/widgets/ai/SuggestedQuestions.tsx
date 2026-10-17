@@ -12,7 +12,7 @@ export function SuggestedQuestions({ onPick, disabled }: { onPick: (question: st
               type="button"
               disabled={disabled}
               onClick={() => onPick(question)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-surface px-3 py-1.5 text-xs text-slate-700 hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50"
             >
               <Sparkles className="size-3 text-brand-500" aria-hidden="true" />
               {question}

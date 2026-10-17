@@ -39,7 +39,7 @@ export function PaginationControls({
           <label className="flex items-center gap-2 text-xs text-slate-500">
             Rows
             <select
-              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs"
+              className="h-8 rounded-md border border-slate-300 bg-surface px-2 text-xs"
               value={pageSize}
               onChange={(event) => onPageSizeChange(Number(event.target.value))}
             >
