@@ -40,6 +40,15 @@ const envSchema = z
      * default 0 the API uses the socket address, so clients cannot fake their IP to dodge rate limits.
      */
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+    /**
+     * Alternatively, the exact proxy addresses (IPs or CIDRs, comma-separated) whose X-Forwarded-For
+     * is trusted, e.g. the web container that forwards /api. Others, such as direct callers of the
+     * API port, are never trusted. Takes precedence over TRUST_PROXY_HOPS.
+     */
+    TRUST_PROXY_ADDRESSES: z
+      .string()
+      .default('')
+      .transform((value) => value.split(',').map((address) => address.trim()).filter(Boolean)),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === 'openai') {

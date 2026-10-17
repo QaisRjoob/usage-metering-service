@@ -15,7 +15,9 @@ function readTimeout(): number {
 
 export const apiConfig = {
   dataSource: readDataSource(),
-  baseUrl: (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/v1').replace(/\/+$/, ''),
+  // Default: same origin as the page (nginx in Docker and the Vite dev server forward /api to the
+  // API), so the browser never makes a cross-origin call.
+  baseUrl: (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/\/+$/, ''),
   timeoutMs: readTimeout(),
   /** Seeded demo API key, pre-filled in the Client Demo. Local demo use only. */
   demoApiKey: import.meta.env.VITE_DEMO_API_KEY?.trim() || null,

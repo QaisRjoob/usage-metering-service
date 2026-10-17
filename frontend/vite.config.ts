@@ -13,6 +13,11 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Same-origin API in development, like nginx in Docker: /api/* goes to the API on :3000.
+    proxy: { '/api': 'http://localhost:3000' },
+  },
+  preview: {
+    proxy: { '/api': 'http://localhost:3000' },
   },
   build: {
     rollupOptions: {

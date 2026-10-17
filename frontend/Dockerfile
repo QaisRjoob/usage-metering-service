@@ -6,8 +6,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# Baked in at build time. The browser calls the API directly, so the URL is the host-visible one.
-ARG VITE_API_BASE_URL=http://localhost:3000/api/v1
+# Baked in at build time. Default: same origin; nginx forwards /api/* to the API container.
+ARG VITE_API_BASE_URL=/api/v1
 ARG VITE_DEMO_API_KEY=
 ENV VITE_DATA_SOURCE=api \
     VITE_API_BASE_URL=${VITE_API_BASE_URL} \
@@ -15,8 +15,8 @@ ENV VITE_DATA_SOURCE=api \
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
-# The API origin the browser may call (Content-Security-Policy connect-src).
-ARG API_ORIGIN=http://localhost:3000
+# Extra API origin the browser may call (CSP connect-src). Empty: the API is same-origin (/api).
+ARG API_ORIGIN=
 ENV API_ORIGIN=${API_ORIGIN}
 # The image renders /etc/nginx/templates/*.template into conf.d at start (envsubst).
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template

@@ -23,7 +23,8 @@ export interface RequestOptions {
 }
 
 export function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const url = new URL(`${apiConfig.baseUrl}${path}`);
+  // The base may be relative ("/api/v1", same origin as the page) or absolute.
+  const url = new URL(`${apiConfig.baseUrl}${path}`, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value === undefined || value === null || value === '') continue;

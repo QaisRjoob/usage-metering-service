@@ -24,6 +24,12 @@ describe('buildUrl', () => {
     expect(url.searchParams.has('outcome')).toBe(false);
     expect(url.searchParams.has('userId')).toBe(false);
   });
+
+  it('calls the API on the same origin as the page by default (no cross-origin request)', () => {
+    const url = new URL(buildUrl('/auth/identify'));
+    expect(url.origin).toBe(window.location.origin);
+    expect(url.pathname).toBe('/api/v1/auth/identify');
+  });
 });
 
 describe('apiRequest', () => {

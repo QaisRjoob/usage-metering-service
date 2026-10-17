@@ -56,6 +56,11 @@ docker compose up --build
 | API docs (Swagger UI) / OpenAPI JSON | http://localhost:3000/docs · http://localhost:3000/api/v1/openapi.json |
 | PostgreSQL (for inspection) | `localhost:5433`, user/password/db `metering` |
 
+The web app calls the API on its own address (`http://localhost:8080/api/v1`): nginx forwards
+`/api/*` to the API container, so there are no cross-origin requests and the app works the same
+whether you open it as `localhost`, `127.0.0.1` or `[::1]`. Port 3000 stays open for API clients,
+curl and the Swagger UI. The containers restart automatically after Docker Desktop restarts.
+
 Startup is automatic: PostgreSQL becomes healthy → the API applies SQL migrations, seeds the
 predefined plans and the demo data (all idempotent) → the web app starts once the API is ready.
 

@@ -53,9 +53,10 @@ your own home. Only one role is signed in at a time. If the server rejects the s
 | AI advisor calls per credential | 10 / min | `AI_RATE_LIMIT_PER_WINDOW` |
 | Request body size | 64 KB | — |
 
-The client IP is the socket address. `X-Forwarded-For` is trusted only when `TRUST_PROXY_HOPS` is
-set (for a reverse proxy you control); otherwise anyone could fake an IP per request and step
-around every per-IP limit.
+The client IP is the socket address. `X-Forwarded-For` is trusted only from proxies you name:
+`TRUST_PROXY_ADDRESSES` (exact addresses; in Docker, the web container that forwards `/api` and
+overwrites the header) or `TRUST_PROXY_HOPS`. Anyone else's header is ignored, otherwise a client
+could fake an IP per request and step around every per-IP limit.
 
 ## Input and data
 
@@ -70,11 +71,14 @@ around every per-IP limit.
 
 - **API**: helmet headers (`X-Content-Type-Options`, `X-Frame-Options`, HSTS, …), CORS limited to
   `CORS_ORIGINS`, request and connection timeouts.
+- **Same-origin API**: nginx forwards `/api/*` to the API, so the browser only ever talks to the
+  origin it loaded the page from: no cross-origin requests, and CORS is only for direct callers.
 - **Web (nginx)**: `Content-Security-Policy` (scripts only from the app itself, no inline scripts,
-  API calls only to `API_ORIGIN`, no framing), `X-Frame-Options: DENY`, `X-Content-Type-Options`,
+  API calls only to the same origin, no framing), `X-Frame-Options: DENY`, `X-Content-Type-Options`,
   `Referrer-Policy: no-referrer`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, no server version.
-- **Containers**: the API runs as the unprivileged `node` user; Compose publishes ports on
-  `127.0.0.1` only, so the local stack is not reachable from the network.
+- **Containers**: the API runs as the unprivileged `node` user; Compose publishes ports on the
+  loopback addresses only (`127.0.0.1` and `::1`), so the local stack is not reachable from the
+  network, and restarts it automatically after Docker or the computer restarts.
 
 ## Before a real deployment
 
@@ -83,6 +87,6 @@ The repository ships demo values so the stack runs with one command. The API pri
 
 1. Set `ADMIN_API_TOKEN` to a long random value (`openssl rand -base64 48`).
 2. Set `SEED_DEMO_DATA=false` (the demo API key is public).
-3. List the real web origin in `CORS_ORIGINS` and build the web image with the real
-   `VITE_API_BASE_URL` and `API_ORIGIN`.
+3. Keep the same-origin `/api` proxy (or list the real web origin in `CORS_ORIGINS` and build the
+   web image with the real `VITE_API_BASE_URL` and `API_ORIGIN`).
 4. Serve both behind HTTPS (and set `TRUST_PROXY_HOPS` to the number of proxies in front of the API).

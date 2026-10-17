@@ -43,8 +43,14 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
     bodyLimit: 64 * 1024,
     connectionTimeout: 15_000,
     requestTimeout: 30_000,
-    // Hop count, not "true": with true any client could set X-Forwarded-For and pick its own IP.
-    trustProxy: config.TRUST_PROXY_HOPS > 0 ? (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS : false,
+    // Never "true": then any client could set X-Forwarded-For and pick its own IP. Either the exact
+    // proxy addresses (the web container) or a hop count; by default no proxy is trusted.
+    trustProxy:
+      config.TRUST_PROXY_ADDRESSES.length > 0
+        ? config.TRUST_PROXY_ADDRESSES
+        : config.TRUST_PROXY_HOPS > 0
+          ? (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS
+          : false,
   });
 
   const authFailures = new AuthFailureLimiter(config.AUTH_FAILURE_LIMIT_PER_MINUTE);

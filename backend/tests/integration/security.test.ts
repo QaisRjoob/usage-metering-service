@@ -62,3 +62,25 @@ describe('response hardening', () => {
     expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:8080');
   });
 });
+
+describe('trusted proxy (the web container forwarding /api)', () => {
+  let proxied: TestContext;
+  beforeAll(async () => {
+    proxied = await createTestContext({ env: { AUTH_FAILURE_LIMIT_PER_MINUTE: '2', TRUST_PROXY_ADDRESSES: '10.9.9.9' } });
+  });
+  afterAll(async () => proxied.close());
+
+  const call = (remoteAddress: string, forwardedFor: string, token: string) =>
+    proxied.app.inject({ method: 'GET', url: '/api/v1/admin/accounts', remoteAddress, headers: { authorization: `Bearer ${token}`, 'x-forwarded-for': forwardedFor } });
+
+  it('uses X-Forwarded-For from the trusted proxy, so each browser client is limited separately', async () => {
+    for (let attempt = 0; attempt < 2; attempt += 1) expect((await call('10.9.9.9', '198.51.100.1', 'wrong-token-0123456789')).statusCode).toBe(401);
+    expect((await call('10.9.9.9', '198.51.100.1', TEST_ADMIN_TOKEN)).statusCode).toBe(429);
+    expect((await call('10.9.9.9', '198.51.100.2', TEST_ADMIN_TOKEN)).statusCode).toBe(200);
+  });
+
+  it('ignores X-Forwarded-For from anyone else', async () => {
+    // A direct caller claims to be the blocked client: the header is ignored, its own address counts.
+    expect((await call('10.0.0.77', '198.51.100.1', TEST_ADMIN_TOKEN)).statusCode).toBe(200);
+  });
+});
