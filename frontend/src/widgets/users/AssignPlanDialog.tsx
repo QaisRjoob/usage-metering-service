@@ -10,7 +10,7 @@ import { Field, Select } from '@/widgets/ui/Field';
 interface AssignPlanDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Who receives the plan, e.g. 'user "alice"' or 'the account'. */
+  /** Who receives the plan, e.g. 'user "ahmad"' or 'the account'. */
   subjectLabel: string;
   scope: PlanScope;
   plans: Plan[];

@@ -58,8 +58,9 @@ export async function seedPredefinedPlans(pool: Pool): Promise<void> {
 }
 
 /**
- * Demo data for the Client Demo (local use only): "Demo Docs Inc" on a small custom account plan
- * (100 units/month, 100/request) with alice (Basic), bob (Premium) and carol (Basic).
+ * Demo data for the Client Demo (local use only): "شركة الوثائق التجريبية" (Demo Docs Co.) on a
+ * small custom account plan (100 units/month, 100/request) with ahmad (Basic), sara (Premium) and
+ * omar (Basic). Names are Arabic; user ids stay ASCII because clients send them in URLs.
  * Idempotent: existing rows are left untouched.
  */
 export async function seedDemoData(pool: Pool, demoApiKey: string): Promise<void> {
@@ -67,7 +68,7 @@ export async function seedDemoData(pool: Pool, demoApiKey: string): Promise<void
     // The custom plan and the account reference each other; the plan FK to its version is deferred.
     const created = await client.query(
       `INSERT INTO accounts (id, name, api_key_hash, api_key_prefix, plan_id)
-       VALUES ($1, 'Demo Docs Inc', $2, $3, $4) ON CONFLICT (id) DO NOTHING RETURNING id`,
+       VALUES ($1, 'شركة الوثائق التجريبية', $2, $3, $4) ON CONFLICT (id) DO NOTHING RETURNING id`,
       [DEMO_ACCOUNT_ID, hashApiKey(demoApiKey), apiKeyPrefixOf(demoApiKey), PREDEFINED_PLAN_IDS.starter],
     );
     await insertPlan(
@@ -75,8 +76,8 @@ export async function seedDemoData(pool: Pool, demoApiKey: string): Promise<void
       {
         id: DEMO_PLAN_ID,
         versionId: '00000000-0000-4000-8000-0000000001d1',
-        name: 'Demo Shared Pool',
-        description: 'Small custom account plan so the shared limit is easy to reach in the demo.',
+        name: 'الرصيد المشترك التجريبي',
+        description: 'باقة حساب مخصصة صغيرة حتى يسهل الوصول إلى الحد المشترك في العرض التجريبي.',
         scope: 'account',
         monthlyAllowance: 100,
         maxUnitsPerRequest: 100,
@@ -86,9 +87,9 @@ export async function seedDemoData(pool: Pool, demoApiKey: string): Promise<void
     // Only a freshly created demo account is moved onto its custom plan; later plan changes are kept.
     if (created.rowCount === 1) await client.query('UPDATE accounts SET plan_id = $2 WHERE id = $1', [DEMO_ACCOUNT_ID, DEMO_PLAN_ID]);
     const users: [string, string, string][] = [
-      ['alice', 'Alice (Basic)', PREDEFINED_PLAN_IDS.basic],
-      ['bob', 'Bob (Premium)', PREDEFINED_PLAN_IDS.premium],
-      ['carol', 'Carol (Basic)', PREDEFINED_PLAN_IDS.basic],
+      ['ahmad', 'أحمد الخطيب', PREDEFINED_PLAN_IDS.basic],
+      ['sara', 'سارة النجار', PREDEFINED_PLAN_IDS.premium],
+      ['omar', 'عمر حداد', PREDEFINED_PLAN_IDS.basic],
     ];
     for (const [externalUserId, displayName, planId] of users) {
       await client.query(

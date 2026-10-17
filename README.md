@@ -64,7 +64,7 @@ predefined plans and the demo data (all idempotent) → the web app starts once 
 | Credential | Value | Used for |
 |---|---|---|
 | Operator admin token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`) | the **operator console** (`/admin`) |
-| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | the **account portal** (`/app`) of "Demo Docs Inc" |
+| Demo account API key | `umk_demo_local_only_do_not_use_in_production` | the **account portal** (`/app`) of "شركة الوثائق التجريبية" |
 
 The web app opens on a **login page with one field**: paste any token and press *Sign in*. The server
 identifies it (`POST /api/v1/auth/identify`): the operator token opens the operator console, an account
@@ -115,18 +115,23 @@ account's API key. It knows nothing about plans; before "processing" a document 
 `POST /usage/consume` with a fresh `requestId`, then shows the decision and both remaining
 allowances.
 
-Seeded demo account **Demo Docs Inc**: custom account plan **Demo Shared Pool** (100 units/month,
-100 per request); users `alice` (Basic: 1,000/month, 20/request), `bob` (Premium: 10,000/month,
-200/request), `carol` (Basic).
+Seeded demo account **شركة الوثائق التجريبية**: custom account plan **الرصيد المشترك التجريبي** (100 units/month,
+100 per request); users `ahmad` (أحمد الخطيب, Basic: 1,000/month, 20/request), `sara` (سارة النجار,
+Premium: 10,000/month, 200/request), `omar` (عمر حداد, Basic). Company and person names in the sample
+data are Arabic; user ids stay in Latin letters because client applications send them in URLs.
+
+**More sample data:** with the stack running, `npm run demo:populate` (in `backend/`) adds three
+more companies with users, a custom plan, accepted and rejected requests, and two sign-up requests,
+all with Arabic names. Run it once on a fresh database.
 
 Run the guided steps in order (each has a **Run** button):
 
 | Step | Request | Result |
 |---|---|---|
-| 1 | alice, 10 units | **Accepted**: +10 for alice and +10 for the account |
-| 2 | alice, 25 units | **Rejected** by `MAX_UNITS_PER_REQUEST`, **user** level (Basic allows 20) |
-| 3 | bob, 95 units | **Rejected** by `MONTHLY_ALLOWANCE`, **account** level (90 shared units left; bob has 10,000) |
-| 4 | Switch alice to Premium (or raise the shared pool) in the plan panel, then repeat step 2 or 3 | Now **accepted** — same client code, different outcome |
+| 1 | ahmad, 10 units | **Accepted**: +10 for ahmad and +10 for the account |
+| 2 | ahmad, 25 units | **Rejected** by `MAX_UNITS_PER_REQUEST`, **user** level (Basic allows 20) |
+| 3 | sara, 95 units | **Rejected** by `MONTHLY_ALLOWANCE`, **account** level (90 shared units left; sara has 10,000) |
+| 4 | Switch ahmad to Premium (or raise the shared pool) in the plan panel, then repeat step 2 or 3 | Now **accepted** — same client code, different outcome |
 | 5 | "Retry same request" | Same `requestId` → the stored decision is **replayed**, nothing is consumed twice |
 
 The plan panel on the same page uses the account's own configuration endpoints, standing in for
@@ -138,7 +143,7 @@ The plan panel on the same page uses the account's own configuration endpoints, 
 cd backend
 npm install
 npm run demo:cli                       # the same scenario from the terminal
-npm run demo:cli -- process alice 10   # a single request
+npm run demo:cli -- process ahmad 10   # a single request
 ```
 
 `API_URL` (default `http://localhost:3000/api/v1`) and `API_KEY` (default the demo key) are
@@ -232,40 +237,40 @@ KEY=umk_live_...   # paste the key
 
 # 2. The application registers users (default plan Basic; Premium has a fixed id)
 curl -s -X POST $API/users -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"externalUserId":"alice"}'
+  -d '{"externalUserId":"ahmad"}'
 curl -s -X POST $API/users -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"externalUserId":"bob","planId":"00000000-0000-4000-8000-000000000004"}'
+  -d '{"externalUserId":"sara","planId":"00000000-0000-4000-8000-000000000004"}'
 
 # 3. Consume: accepted (200, "accepted": true, remaining for account and user)
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"userId":"alice","units":10,"requestId":"doc-1001"}'
+  -d '{"userId":"ahmad","units":10,"requestId":"doc-1001"}'
 
 # 4. Rejection: 25 > Basic's 20 per request (200, "accepted": false, rule + level)
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"userId":"alice","units":25,"requestId":"doc-1002"}'
+  -d '{"userId":"ahmad","units":25,"requestId":"doc-1002"}'
 
 # 5. Retry of doc-1001: replayed, nothing consumed again ("idempotentReplay": true)
 curl -si -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"userId":"alice","units":10,"requestId":"doc-1001"}'
+  -d '{"userId":"ahmad","units":10,"requestId":"doc-1001"}'
 
 # 6. Plan change: a small custom shared plan, assigned to the account
 PLAN=$(curl -s -X POST $API/plans -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"name":"Tiny pool","scope":"account","monthlyAllowance":50,"maxUnitsPerRequest":100}' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 curl -s -X PUT $API/account/plan -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d "{\"planId\":\"$PLAN\"}"
-# bob (Premium) asks for 45: only 40 shared units remain -> rejected at the ACCOUNT level
+# sara (Premium) asks for 45: only 40 shared units remain -> rejected at the ACCOUNT level
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"userId":"bob","units":45,"requestId":"doc-1003"}'
+  -d '{"userId":"sara","units":45,"requestId":"doc-1003"}'
 # raise the plan (creates version 2) and try again with a new requestId -> accepted
 curl -s -X PATCH $API/plans/$PLAN -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"monthlyAllowance":500}'
 curl -s -X POST $API/usage/consume -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
-  -d '{"userId":"bob","units":45,"requestId":"doc-1004"}'
+  -d '{"userId":"sara","units":45,"requestId":"doc-1004"}'
 
 # 7. History (accepted and rejected), any month, filters: userId, outcome, month, from, to
 curl -s "$API/usage?pageSize=10&outcome=rejected" -H "X-API-Key: $KEY"
 curl -s "$API/account/usage-summary?month=2026-10" -H "X-API-Key: $KEY"
 
 # Dry run (never consumes or records)
-curl -s -X POST $API/quotas/check -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"userId":"alice","units":5}'
+curl -s -X POST $API/quotas/check -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"userId":"ahmad","units":5}'
 ```
 
 ## 6. Supported rules and evaluation order

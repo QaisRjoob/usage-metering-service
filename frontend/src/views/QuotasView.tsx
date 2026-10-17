@@ -33,7 +33,7 @@ function DryRunCheck({ vm }: { vm: ReturnType<typeof useQuotaViewModel> }) {
       <CardBody className="space-y-4">
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[1fr_8rem_auto] sm:items-end" noValidate>
           <Field label="User id" error={errors.userId}>
-            {(props) => <Input {...props} value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="e.g. alice" />}
+            {(props) => <Input {...props} value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="e.g. ahmad" />}
           </Field>
           <Field label="Units" error={errors.units}>
             {(props) => <Input {...props} type="number" min={1} step={1} value={units} onChange={(event) => setUnits(event.target.value)} />}

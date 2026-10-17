@@ -4,7 +4,7 @@
  * API key on behalf of its users, exactly like the Client Demo page.
  *
   *   npm run demo:cli                       # runs the guided scenario against the seeded demo account
- *   npm run demo:cli -- process alice 10   # one request
+ *   npm run demo:cli -- process ahmad 10   # one request
  *
  * Environment: API_URL (default http://localhost:3000/api/v1), API_KEY (default: seeded demo key).
  * The scenario switches a user's plan through the account's own API, so run it on a fresh demo
@@ -46,20 +46,20 @@ async function scenario() {
   const me = await call('GET', '/account');
   console.log(`Client running as "${me.account.name}" (plan ${me.plan.name}: ${me.quota.remaining} of ${me.quota.monthlyAllowance} units left this month)`);
 
-  show('1. Invoice for alice (Basic user)', await processDocument('alice', 10));
-  show('2. Contract for alice - larger than her per-request limit', await processDocument('alice', 25));
-  show('3. Annual report for bob (Premium) - larger than what the shared account has left', await processDocument('bob', 95));
+  show('1. Invoice for ahmad (Basic user)', await processDocument('ahmad', 10));
+  show('2. Contract for ahmad - larger than his per-request limit', await processDocument('ahmad', 25));
+  show('3. Annual report for sara (Premium) - larger than what the shared account has left', await processDocument('sara', 95));
 
-  console.log('\n-- The account switches alice to Premium (configuration change, no client code change) --');
-  await call('PUT', '/users/alice/plan', { planId: PREMIUM_PLAN_ID });
-  show('4. Same contract for alice again', await processDocument('alice', 25));
+  console.log('\n-- The account switches ahmad to Premium (configuration change, no client code change) --');
+  await call('PUT', '/users/ahmad/plan', { planId: PREMIUM_PLAN_ID });
+  show('4. Same contract for ahmad again', await processDocument('ahmad', 25));
 
   const requestId = randomUUID();
-  show('5a. Memo for carol', await processDocument('carol', 5, requestId));
-  show('5b. Network retry of the same request (same requestId)', await processDocument('carol', 5, requestId));
+  show('5a. Memo for omar', await processDocument('omar', 5, requestId));
+  show('5b. Network retry of the same request (same requestId)', await processDocument('omar', 5, requestId));
 
-  await call('PUT', '/users/alice/plan', { planId: BASIC_PLAN_ID });
-  console.log('\n(alice was switched back to Basic; units already consumed stay counted this month)');
+  await call('PUT', '/users/ahmad/plan', { planId: BASIC_PLAN_ID });
+  console.log('\n(ahmad was switched back to Basic; units already consumed stay counted this month)');
 }
 
 const [command, userId, units] = process.argv.slice(2);

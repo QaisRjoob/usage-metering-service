@@ -12,16 +12,16 @@ costs **units** (credits). The company has a monthly budget of units for everyon
 of its users also has a personal monthly limit.
 
 The **Usage Metering & Quota Service** is the part that keeps score. Before the company's tool
-processes a document, it asks the service: *"May user alice use 10 units right now?"* The service:
+processes a document, it asks the service: *"May user ahmad use 10 units right now?"* The service:
 
 1. checks **two plans at the same time**:
    - the **account plan** — the company's shared budget (for example 10,000 units per month, at most
      100 units in one request), and
-   - the **user plan** — alice's personal limit (for example 1,000 units per month, at most 20 per
+   - the **user plan** — ahmad's personal limit (for example 1,000 units per month, at most 20 per
      request);
 2. answers **accepted** or **rejected**. A rejection always says **which rule** blocked it
    (*monthly allowance* or *max units per request*) and **whose rule** it was (*account* or *user*);
-3. if accepted, counts the units for both alice and the company; if rejected, counts nothing;
+3. if accepted, counts the units for both ahmad and the company; if rejected, counts nothing;
 4. remembers every decision, so you can look at history for any month.
 
 It also handles the awkward cases correctly: if the company's tool sends the same request twice (for
@@ -33,7 +33,7 @@ same moment, the limits are never exceeded.
 | Word | Meaning |
 |---|---|
 | **Account** | A company (an application) that uses the service. It has one secret **API key**. |
-| **User** | A person using that company's tool, for example `alice`. Belongs to one account. |
+| **User** | A person using that company's tool, for example `ahmad`. Belongs to one account. |
 | **Plan** | A set of two limits: **monthly allowance** and **max units per request**. Account plans are shared by all users of the account; user plans are personal. |
 | **Predefined plan** | A ready-made plan everyone can use: Starter, Pro (account) and Basic, Premium (user). They cannot be edited. |
 | **Custom plan** | A plan an account creates for itself. It can be edited; every edit creates a new **version**. |
@@ -82,7 +82,7 @@ docker compose up -d
 | Credential | Value | Where it comes from |
 |---|---|---|
 | Admin token (operator) | `local-admin-token-change-me` | set in `docker-compose.yml` (`ADMIN_API_TOKEN`) |
-| Demo company API key | `umk_demo_local_only_do_not_use_in_production` | created automatically at startup for the company **Demo Docs Inc** |
+| Demo company API key | `umk_demo_local_only_do_not_use_in_production` | created automatically at startup for the company **شركة الوثائق التجريبية** |
 
 These are public example values for trying the app on your own computer only.
 
@@ -148,14 +148,14 @@ loaded until you fix it.
 
 Sign in with the demo company key (`umk_demo_local_only_do_not_use_in_production`, or the **Use demo company key** button). Follow these steps in order on a fresh demo.
 
-The demo company **Demo Docs Inc** uses a deliberately small shared plan, **Demo Shared Pool**: 100
+The demo company **شركة الوثائق التجريبية** uses a deliberately small shared plan, **الرصيد المشترك التجريبي**: 100
 units per month, at most 100 per request. It has three users:
 
 | User | Plan | Personal limits |
 |---|---|---|
-| `alice` | Basic | 1,000 per month, at most 20 per request |
-| `bob` | Premium | 10,000 per month, at most 200 per request |
-| `carol` | Basic | 1,000 per month, at most 20 per request |
+| `ahmad` (أحمد الخطيب) | Basic | 1,000 per month, at most 20 per request |
+| `sara` (سارة النجار) | Premium | 10,000 per month, at most 200 per request |
+| `omar` (عمر حداد) | Basic | 1,000 per month, at most 20 per request |
 
 ### Step 1 — Run the Client Demo
 
@@ -171,13 +171,13 @@ Press **Run** on each step:
 
 | # | What it sends | Expected answer | Why |
 |---|---|---|---|
-| 1 | alice, 10 units (invoice) | **Accepted** | Both plans allow it. Account: 90 of 100 left. alice: 990 of 1,000 left. |
-| 2 | alice, 25 units (contract) | **Rejected** — *Max units per request*, **User (individual)** | Basic allows at most 20 per request. Nothing was counted. |
-| 3 | bob, 95 units (annual report) | **Rejected** — *Monthly allowance*, **Account (shared)** | Only 90 shared units are left. bob personally still has 10,000 — the shared limit blocks him. |
+| 1 | ahmad, 10 units (invoice) | **Accepted** | Both plans allow it. Account: 90 of 100 left. ahmad: 990 of 1,000 left. |
+| 2 | ahmad, 25 units (contract) | **Rejected** — *Max units per request*, **User (individual)** | Basic allows at most 20 per request. Nothing was counted. |
+| 3 | sara, 95 units (annual report) | **Rejected** — *Monthly allowance*, **Account (shared)** | Only 90 shared units are left. sara personally still has 10,000 — the shared limit blocks her. |
 
 ### Step 2 — Change a plan and repeat
 
-In the **Plan changes** panel on the same page, keep *alice* and *Premium* selected and click
+In the **Plan changes** panel on the same page, keep *ahmad* and *Premium* selected and click
 **Switch plan**. Then press **Run** on step 2 again: now it is **Accepted**. The client did not
 change — only the plan did. (Alternatively raise the shared plan's allowance under **Edit the shared
 account plan** and repeat step 3.)

@@ -73,7 +73,7 @@ export function UsageFilters({ list, showAccountFilter, totalItems, isFetching }
       advanced={
         <>
           {showAccountFilter && <AccountPicker value={f.accountId ?? ''} onChange={(value) => list.set({ accountId: value })} />}
-          <TextFilter label="User id (exact)" value={f.userId ?? ''} onChange={(value) => list.set({ userId: value })} placeholder="e.g. alice" error={list.errors.userId} />
+          <TextFilter label="User id (exact)" value={f.userId ?? ''} onChange={(value) => list.set({ userId: value })} placeholder="e.g. ahmad" error={list.errors.userId} />
           <SelectFilter
             label="Rejection rule"
             value={f.rule ?? ''}

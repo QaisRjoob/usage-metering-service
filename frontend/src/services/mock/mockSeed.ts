@@ -35,21 +35,41 @@ function createRandom(seed: number) {
 }
 
 const COMPANY_NAMES = [
-  'Acme Legal',
-  'Northwind Papers',
-  'Globex Archive',
-  'Initech Scans',
-  'Umbrella Forms',
-  'Stark Contracts',
-  'Wayne Records',
-  'Hooli Docs',
-  'Vandelay Imports',
-  'Soylent Filings',
-  'Cyberdyne Ledger',
-  'Tyrell Paperworks',
+  'مكتب العدل للمحاماة',
+  'أوراق الشمال',
+  'أرشيف الخليج',
+  'مسح البيان',
+  'نماذج الواحة',
+  'عقود النجمة',
+  'سجلات القدس',
+  'وثائق الرافدين',
+  'تجارة الأندلس',
+  'ملفات النخيل',
+  'دفاتر الصقر',
+  'مطبعة الياسمين',
 ];
 
-const FIRST_NAMES = ['ana', 'ben', 'chen', 'dara', 'eli', 'fatima', 'gus', 'hana', 'ivan', 'jade', 'kofi', 'lina', 'mo', 'nora', 'omar'];
+/** User ids stay ASCII (clients send them in URLs); the display names are Arabic. */
+const PEOPLE: [id: string, name: string][] = [
+  ['ahmad', 'أحمد'],
+  ['sara', 'سارة'],
+  ['omar', 'عمر'],
+  ['layla', 'ليلى'],
+  ['yousef', 'يوسف'],
+  ['fatima', 'فاطمة'],
+  ['khaled', 'خالد'],
+  ['huda', 'هدى'],
+  ['ali', 'علي'],
+  ['mariam', 'مريم'],
+  ['hasan', 'حسن'],
+  ['noor', 'نور'],
+  ['rami', 'رامي'],
+  ['dana', 'دانة'],
+  ['tariq', 'طارق'],
+];
+
+/** Family names of generated people; the demo users' family names are left out so their full names stay unique. */
+const FAMILY_NAMES = ['العلي', 'الشريف', 'منصور', 'الحسيني', 'عودة', 'سلامة', 'القاسم', 'البرغوثي', 'الزعبي', 'عيسى'];
 
 /**
  * Share of the monthly allowance each generated account would use over a full month. Values above
@@ -71,11 +91,11 @@ export function seedMockDatabase(db: MockDatabase): void {
   db.createPlan({ id: PREDEFINED_PLAN_IDS.premium, name: 'Premium', description: 'Predefined user plan with larger limits.', scope: 'user', isPredefined: true, ownerAccountId: null, monthlyAllowance: 10_000, maxUnitsPerRequest: 200, at: createdAt });
 
   // Demo account for the Client Demo scenario. Current month starts empty.
-  db.createPlan({ id: DEMO_PLAN_ID, name: 'Demo Shared Pool', description: 'Small custom account plan so the shared limit is easy to reach in the demo.', scope: 'account', isPredefined: false, ownerAccountId: DEMO_ACCOUNT_ID, monthlyAllowance: 100, maxUnitsPerRequest: 100, at: createdAt });
-  const { row: demo } = db.createAccount({ id: DEMO_ACCOUNT_ID, name: 'Demo Docs Inc', planId: DEMO_PLAN_ID, apiKey: DEMO_API_KEY, at: createdAt });
-  const alice = db.createUser({ accountId: demo.id, externalUserId: 'alice', displayName: 'Alice (Basic)', planId: PREDEFINED_PLAN_IDS.basic, at: createdAt });
-  const bob = db.createUser({ accountId: demo.id, externalUserId: 'bob', displayName: 'Bob (Premium)', planId: PREDEFINED_PLAN_IDS.premium, at: createdAt });
-  db.createUser({ accountId: demo.id, externalUserId: 'carol', displayName: 'Carol (Basic)', planId: PREDEFINED_PLAN_IDS.basic, at: createdAt });
+  db.createPlan({ id: DEMO_PLAN_ID, name: 'الرصيد المشترك التجريبي', description: 'باقة حساب مخصصة صغيرة حتى يسهل الوصول إلى الحد المشترك في العرض التجريبي.', scope: 'account', isPredefined: false, ownerAccountId: DEMO_ACCOUNT_ID, monthlyAllowance: 100, maxUnitsPerRequest: 100, at: createdAt });
+  const { row: demo } = db.createAccount({ id: DEMO_ACCOUNT_ID, name: 'شركة الوثائق التجريبية', planId: DEMO_PLAN_ID, apiKey: DEMO_API_KEY, at: createdAt });
+  const ahmad = db.createUser({ accountId: demo.id, externalUserId: 'ahmad', displayName: 'أحمد الخطيب', planId: PREDEFINED_PLAN_IDS.basic, at: createdAt });
+  const sara = db.createUser({ accountId: demo.id, externalUserId: 'sara', displayName: 'سارة النجار', planId: PREDEFINED_PLAN_IDS.premium, at: createdAt });
+  db.createUser({ accountId: demo.id, externalUserId: 'omar', displayName: 'عمر حداد', planId: PREDEFINED_PLAN_IDS.basic, at: createdAt });
 
   const random = createRandom(20261012);
   const generated = COMPANY_NAMES.map((name, index) => {
@@ -86,15 +106,16 @@ export function seedMockDatabase(db: MockDatabase): void {
       at: new Date(createdAt.getTime() + index * 3_600_000),
     });
     const userCount = random.int(3, 12);
-    const users = Array.from({ length: userCount }, (_, userIndex) =>
-      db.createUser({
+    const users = Array.from({ length: userCount }, (_, userIndex) => {
+      const [id, firstName] = PEOPLE[userIndex % PEOPLE.length]!;
+      return db.createUser({
         accountId: row.id,
-        externalUserId: `${FIRST_NAMES[userIndex % FIRST_NAMES.length]}.${index + 1}${userIndex >= FIRST_NAMES.length ? userIndex : ''}`,
-        displayName: null,
+        externalUserId: `${id}.${index + 1}${userIndex >= PEOPLE.length ? userIndex : ''}`,
+        displayName: `${firstName} ${FAMILY_NAMES[(index + userIndex) % FAMILY_NAMES.length]}`,
         planId: userIndex % 3 === 0 ? PREDEFINED_PLAN_IDS.basic : PREDEFINED_PLAN_IDS.premium,
         at: createdAt,
-      }),
-    );
+      });
+    });
     return {
       account: row,
       users,
@@ -130,9 +151,9 @@ export function seedMockDatabase(db: MockDatabase): void {
       }
       // A little demo-account history in previous months only.
       if (monthOffset < 0 && day % 6 === 0) {
-        const user = day % 12 === 0 ? bob : alice;
+        const user = day % 12 === 0 ? sara : ahmad;
         sequence += 1;
-        db.consume(demo, { userId: user.externalUserId, units: user === bob ? 30 : 12, requestId: `seed-${sequence}` }, new Date(dayStart + 36_000_000));
+        db.consume(demo, { userId: user.externalUserId, units: user === sara ? 30 : 12, requestId: `seed-${sequence}` }, new Date(dayStart + 36_000_000));
       }
     }
   }

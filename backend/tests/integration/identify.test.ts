@@ -23,7 +23,7 @@ describe('POST /auth/identify (single-field login)', () => {
       role: 'account',
       account: { id: created.account.id, name: created.account.name, apiKeyPrefix: created.account.apiKeyPrefix },
     });
-    expect((await identify(TEST_DEMO_API_KEY)).json()).toMatchObject({ role: 'account', account: { name: 'Demo Docs Inc' } });
+    expect((await identify(TEST_DEMO_API_KEY)).json()).toMatchObject({ role: 'account', account: { name: 'شركة الوثائق التجريبية' } });
   });
 
   it('trims surrounding whitespace from pasted tokens', async () => {

@@ -42,7 +42,7 @@ describe('API key validation', () => {
 
   it('accepts the seeded demo key', async () => {
     const response = await ctx.app.inject({ method: 'GET', url: '/api/v1/account', headers: keyHeaders(TEST_DEMO_API_KEY) });
-    expect(response.json()).toMatchObject({ account: { name: 'Demo Docs Inc' }, plan: { name: 'Demo Shared Pool' } });
+    expect(response.json()).toMatchObject({ account: { name: 'شركة الوثائق التجريبية' }, plan: { name: 'الرصيد المشترك التجريبي' } });
   });
 });
 

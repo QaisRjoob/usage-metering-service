@@ -33,7 +33,7 @@ describe('AI advisor', () => {
     const context = JSON.stringify(provider.inputs.at(-1)?.context);
     expect(context).toContain('alice');
     expect(context).not.toContain(apiKey);
-    expect(context).not.toContain('Demo Docs Inc');
+    expect(context).not.toContain('شركة الوثائق التجريبية');
   });
 
   it('with the admin token, answers across accounts', async () => {

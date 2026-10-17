@@ -3,7 +3,7 @@ import { loadConfig, securityWarnings } from './config/env';
 import { createContainer } from './container';
 import { OpenAIProvider } from './Infrastructure/AI/Providers/OpenAIProvider';
 import { runMigrations } from './Infrastructure/Database/migrator';
-import { createPool } from './Infrastructure/Database/postgres';
+import { createPool, waitForDatabase } from './Infrastructure/Database/postgres';
 import { seedDemoData, seedPredefinedPlans } from './Infrastructure/Database/seed/seed';
 
 /** Process entry point: config -> database (migrate + seed) -> container -> HTTP server. */
@@ -17,6 +17,7 @@ async function main(): Promise<void> {
     onTransactionRetry: (attempt, code) => app.log.warn({ attempt, code }, 'transaction retried after a deadlock/serialization failure'),
   });
   const app = await buildApp(container);
+  await waitForDatabase(pool, (attempt, error) => app.log.warn({ attempt, err: error.message }, 'database not reachable yet; retrying'));
 
   if (config.RUN_MIGRATIONS) {
     const applied = await runMigrations(pool, (message) => app.log.info(message));

@@ -20,7 +20,8 @@
     "perf:seed": "node tests/performance/seed-perf-dataset.mjs",
     "db:migrate": "tsx --env-file-if-exists=.env src/Infrastructure/Database/cli.ts migrate",
     "db:seed": "tsx --env-file-if-exists=.env src/Infrastructure/Database/cli.ts seed",
-    "demo:cli": "node scripts/demo-client.mjs"
+    "demo:cli": "node scripts/demo-client.mjs",
+    "demo:populate": "node scripts/populate-demo.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",

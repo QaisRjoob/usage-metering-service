@@ -182,7 +182,7 @@ The claim code travels in the JSON body, never in the URL. Status and claim shar
 
 ```json
 {
-  "usageRecordId": "…", "requestId": "doc_123", "userId": "alice", "units": 25,
+  "usageRecordId": "…", "requestId": "doc_123", "userId": "ahmad", "units": 25,
   "accepted": false,
   "rejection": { "rule": "MAX_UNITS_PER_REQUEST", "level": "user", "limit": 20, "requested": 25, "remaining": null, "message": "…" },
   "violations": [ … ],

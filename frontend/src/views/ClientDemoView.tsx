@@ -60,7 +60,7 @@ function ClientDemoContent() {
           </Card>
 
           <Card>
-            <CardHeader title="Guided scenario" description="Run the steps in order on the seeded demo account (Demo Shared Pool: 100 units/month)." />
+            <CardHeader title="Guided scenario" description="Run the steps in order on the seeded demo account (الرصيد المشترك التجريبي: 100 units/month)." />
             <CardBody>
               <ol className="space-y-3">
                 {vm.steps.map((step, index) => (

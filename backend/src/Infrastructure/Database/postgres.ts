@@ -32,6 +32,27 @@ export function createPool(connectionString: string, max: number): pg.Pool {
   });
 }
 
+/**
+ * Waits until the database accepts connections (e.g. while a fresh PostgreSQL container is still
+ * initializing). Retries every `delayMs` up to `attempts` times, then gives up with the last error.
+ */
+export async function waitForDatabase(
+  pool: pg.Pool,
+  onRetry: (attempt: number, error: Error) => void = () => {},
+  { attempts = 30, delayMs = 1_000 }: { attempts?: number; delayMs?: number } = {},
+): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await pool.query('SELECT 1');
+      return;
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      onRetry(attempt, error as Error);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 /** PostgreSQL error codes handled explicitly. */
 export const PG_ERROR = {
   UNIQUE_VIOLATION: '23505',

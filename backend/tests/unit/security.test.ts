@@ -42,3 +42,16 @@ describe('securityWarnings', () => {
     expect(loadConfig(base).TRUST_PROXY_HOPS).toBe(0);
   });
 });
+
+describe('waitForDatabase', () => {
+  it('retries until the database answers, then gives up after the last attempt', async () => {
+    const { waitForDatabase } = await import('../../src/Infrastructure/Database/postgres');
+    let calls = 0;
+    const flaky = { query: async () => (++calls < 3 ? Promise.reject(new Error('ECONNREFUSED')) : { rows: [] }) };
+    const retries: number[] = [];
+    await waitForDatabase(flaky as never, (attempt) => retries.push(attempt), { attempts: 5, delayMs: 1 });
+    expect(retries).toEqual([1, 2]);
+    const down = { query: async () => Promise.reject(new Error('down')) };
+    await expect(waitForDatabase(down as never, () => {}, { attempts: 2, delayMs: 1 })).rejects.toThrow('down');
+  });
+});
