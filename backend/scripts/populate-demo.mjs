@@ -51,7 +51,7 @@ const COMPANIES = [
     requests: [['layla', 15], ['yousef', 120], ['khaled', 60], ['layla', 35], ['mariam', 10], ['yousef', 90], ['mariam', 35], ['khaled', 45]],
   },
   {
-    name: 'أوراق الشمال',
+    name: 'دار الشمال للطباعة والنشر',
     plan: PLANS.starter,
     users: [
       ['huda', 'هدى سلامة', PLANS.basic],
@@ -61,7 +61,7 @@ const COMPANIES = [
     requests: [['huda', 12], ['ali', 80], ['noor', 18], ['huda', 35], ['ali', 95], ['noor', 5]],
   },
   {
-    name: 'أرشيف الخليج',
+    name: 'مركز الخليج للأرشفة الرقمية',
     plan: PLANS.starter,
     customUserPlan: { name: 'باقة الأرشيف الموسعة', description: 'باقة مستخدم مخصصة لفريق الأرشفة: رصيد شهري أكبر.', monthlyAllowance: 5_000, maxUnitsPerRequest: 100 },
     users: [
