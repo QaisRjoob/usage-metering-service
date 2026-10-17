@@ -43,8 +43,13 @@ services:
       PORT: "3000"
       DATABASE_URL: postgres://metering:metering@postgres:5432/metering
       DATABASE_POOL_MAX: "20"
-      # Local/demo operator token. Override in a .env file next to this compose file.
+      # Local/demo operator token (exchanged at POST /auth/token for an operator JWT). Override in a
+      # .env file next to this compose file.
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-local-admin-token-change-me}
+      # Signs the JWT access tokens (HS256). Local/demo value: override it for anything real.
+      JWT_SECRET: ${JWT_SECRET:-local-jwt-secret-change-me-0123456789abcdef}
+      # http:// locally; set true behind HTTPS so the refresh cookie is Secure.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # Only for direct browser calls (e.g. a dev server pointed at :3000); the web app is same-origin.
       CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173
       LOG_LEVEL: ${LOG_LEVEL:-info}

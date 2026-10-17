@@ -12,8 +12,16 @@ const envSchema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(200).default(20),
-    /** Operator token for /api/v1/admin/*. Local/demo mechanism; at least 16 characters. */
+    /** The operator's credential, exchanged at POST /auth/token for an operator JWT; at least 16 characters. */
     ADMIN_API_TOKEN: z.string().min(16, 'ADMIN_API_TOKEN must be at least 16 characters'),
+    /** HS256 signing secret for JWT access tokens; at least 32 characters (e.g. openssl rand -base64 48). */
+    JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+    /** Lifetime of an access token in seconds (default 15 minutes). */
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(900),
+    /** Lifetime of a refresh token (session inactivity limit) in days. */
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+    /** Mark the refresh cookie Secure (HTTPS only). Off for the local http:// stack. */
+    COOKIE_SECURE: booleanFlag.default(false),
     CORS_ORIGINS: z
       .string()
       .default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080')
@@ -61,6 +69,7 @@ export type AppConfig = z.infer<typeof envSchema>;
 
 /** Demo values shipped in the repository; fine locally, never for a real deployment. */
 const PLACEHOLDER_ADMIN_TOKENS = new Set(['local-admin-token-change-me', 'change-me-local-admin-token']);
+const PLACEHOLDER_JWT_SECRETS = new Set(['local-jwt-secret-change-me-0123456789abcdef', 'change-me-local-jwt-secret-0123456789abcdef']);
 
 /** Configuration problems that do not stop a local demo but must be fixed before a real deployment. */
 export function securityWarnings(config: AppConfig): string[] {
@@ -69,6 +78,8 @@ export function securityWarnings(config: AppConfig): string[] {
   if (PLACEHOLDER_ADMIN_TOKENS.has(config.ADMIN_API_TOKEN) || config.ADMIN_API_TOKEN.length < 32) {
     warnings.push('ADMIN_API_TOKEN is a demo placeholder or shorter than 32 characters. Set a long random token (e.g. openssl rand -base64 48).');
   }
+  if (PLACEHOLDER_JWT_SECRETS.has(config.JWT_SECRET)) warnings.push('JWT_SECRET is a demo placeholder. Set a long random secret (e.g. openssl rand -base64 48).');
+  if (!config.COOKIE_SECURE) warnings.push('COOKIE_SECURE is off; serve the app over HTTPS and enable it so the refresh cookie is never sent in clear text.');
   if (config.SEED_DEMO_DATA) warnings.push('SEED_DEMO_DATA is enabled; the demo API key is public. Disable it outside local demos.');
   if (config.CORS_ORIGINS.some((origin) => origin === '*')) warnings.push('CORS_ORIGINS contains "*"; list the web app origins instead.');
   return warnings;

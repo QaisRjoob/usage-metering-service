@@ -10,12 +10,12 @@ import {
   rejectSignupSchema,
   signupCredentialsSchema,
   submitSignupRequestSchema,
+  tokenRequestSchema,
   companyStatsQuerySchema,
   userFacetsQuerySchema,
   aiAdvisorRequestSchema,
   assignPlanSchema,
   consumeRequestSchema,
-  identifyCredentialSchema,
   createAccountSchema,
   createPlanSchema,
   createUserSchema,
@@ -58,7 +58,9 @@ const routes: RouteDoc[] = [
   { method: 'get', path: '/health', tag: 'Health', summary: 'Liveness', security: 'none', response: 'Status' },
   { method: 'get', path: '/ready', tag: 'Health', summary: 'Readiness (checks PostgreSQL)', security: 'none', response: 'Status' },
 
-  { method: 'post', path: '/auth/identify', tag: 'Auth', summary: 'Login helper: tells whether a token is the admin token (operator) or an account API key', security: 'none', body: identifyCredentialSchema, response: 'Object' },
+  { method: 'post', path: '/auth/token', tag: 'Auth', summary: 'Sign in: exchange an account API key or the operator token for a JWT access token (refresh token set as an HttpOnly cookie)', security: 'none', body: tokenRequestSchema, response: 'Object' },
+  { method: 'post', path: '/auth/refresh', tag: 'Auth', summary: 'New access token from the refresh cookie (the refresh token is rotated). Requires X-Requested-With: umk-web', security: 'none', response: 'Object' },
+  { method: 'post', path: '/auth/logout', tag: 'Auth', summary: 'Revoke the session and clear the refresh cookie. Requires X-Requested-With: umk-web', security: 'none', status: 204, response: 'Object' },
   { method: 'post', path: '/signup-requests', tag: 'Sign-up', summary: 'Request an account (public). Returns a request id and a claim code, shown once', security: 'none', body: submitSignupRequestSchema, status: 201, response: 'Object' },
   { method: 'post', path: '/signup-requests/status', tag: 'Sign-up', summary: 'Status of your request (request id + claim code)', security: 'none', body: signupCredentialsSchema, response: 'Object' },
   { method: 'post', path: '/signup-requests/claim', tag: 'Sign-up', summary: 'Collect the API key of an approved request, once', security: 'none', body: signupCredentialsSchema, response: 'Object' },
@@ -140,8 +142,8 @@ const ruleViolation = {
 
 const components = {
   securitySchemes: {
-    apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Account API key (issued once at account creation).' },
-    admin: { type: 'http', scheme: 'bearer', description: 'Operator token (ADMIN_API_TOKEN). Local/demo mechanism.' },
+    apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Account API key (issued once at account creation), for server-to-server clients.' },
+    bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'JWT access token from POST /auth/token (role operator or account), 15 minutes.' },
   },
   schemas: {
     Error: {
@@ -219,8 +221,9 @@ function responseSchema(name: string): object {
 
 function securityFor(security: Security): object[] | undefined {
   if (security === 'none') return [];
-  if (security === 'either') return [{ apiKey: [] }, { admin: [] }];
-  return [{ [security]: [] }];
+  // Operator routes: an operator JWT. Account routes: an account JWT or the API key.
+  if (security === 'admin') return [{ bearer: [] }];
+  return [{ bearer: [] }, { apiKey: [] }];
 }
 
 function queryParameters(schema: ZodObject): object[] {

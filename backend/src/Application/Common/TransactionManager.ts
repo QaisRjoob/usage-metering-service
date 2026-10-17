@@ -1,4 +1,5 @@
 import type { AccountRepository } from '../Modules/Accounts/Interfaces/AccountRepository';
+import type { RefreshTokenRepository } from '../Modules/Auth/Interfaces/AuthPorts';
 import type { PlanRepository } from '../Modules/Plans/Interfaces/PlanRepository';
 import type { QuotaRepository } from '../Modules/Quotas/Interfaces/QuotaRepository';
 import type { SignupRequestRepository } from '../Modules/Signup/Interfaces/SignupRequestRepository';
@@ -13,6 +14,7 @@ export interface Repositories {
   quotas: QuotaRepository;
   usage: UsageRepository;
   signupRequests: SignupRequestRepository;
+  refreshTokens: RefreshTokenRepository;
 }
 
 /**

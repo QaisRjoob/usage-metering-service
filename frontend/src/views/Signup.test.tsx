@@ -5,8 +5,8 @@ import { AppRouter } from '@/routing/AppRouter';
 import { credentials } from '@/services/api/credentials';
 import { createMockSignupService } from '@/services/mock/mockSignupService';
 import { resetMockDb } from '@/services/mock/mockRuntime';
-import { MOCK_ADMIN_TOKEN } from '@/services/mock/mockSeed';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { signInAsOperator } from '@/test/session';
 import { signupSession } from '@/utils/signupSession';
 
 const service = createMockSignupService();
@@ -55,7 +55,7 @@ describe('self-service sign-up', () => {
 
   it('lets the operator approve a request from the access requests page', async () => {
     const user = userEvent.setup();
-    credentials.setAdminToken(MOCK_ADMIN_TOKEN);
+    signInAsOperator();
     await service.submit(application);
     renderWithProviders(<AppRouter />, { route: '/admin/requests' });
     expect(await screen.findByText('Initech', {}, { timeout: 15_000 })).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe('self-service sign-up', () => {
 
   it('requires a reason to deny, and the applicant reads it', async () => {
     const user = userEvent.setup();
-    credentials.setAdminToken(MOCK_ADMIN_TOKEN);
+    signInAsOperator();
     const sent = await service.submit(application);
     renderWithProviders(<AppRouter />, { route: '/admin/requests?status=pending' });
     await user.click(await screen.findByRole('button', { name: 'Deny Initech' }, { timeout: 15_000 }));
@@ -90,7 +90,7 @@ describe('self-service sign-up', () => {
   it('lets an approved company collect its key once and open its portal', async () => {
     const user = userEvent.setup();
     const sent = await service.submit(application);
-    credentials.setAdminToken(MOCK_ADMIN_TOKEN);
+    signInAsOperator();
     await service.approve(sent.requestId, { note: 'Welcome!' });
     credentials.clearAll();
     signupSession.save({ requestId: sent.requestId, claimCode: sent.claimCode });

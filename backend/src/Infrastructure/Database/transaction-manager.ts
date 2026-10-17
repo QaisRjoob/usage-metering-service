@@ -2,6 +2,7 @@ import type { Repositories, TransactionManager } from '../../Application/Common/
 import { PostgresAccountRepository } from '../Repositories/PostgresAccountRepository';
 import { PostgresPlanRepository } from '../Repositories/PostgresPlanRepository';
 import { PostgresQuotaRepository } from '../Repositories/PostgresQuotaRepository';
+import { PostgresRefreshTokenRepository } from '../Repositories/PostgresRefreshTokenRepository';
 import { PostgresSignupRequestRepository } from '../Repositories/PostgresSignupRequestRepository';
 import { PostgresUsageRepository } from '../Repositories/PostgresUsageRepository';
 import { PostgresUserRepository } from '../Repositories/PostgresUserRepository';
@@ -15,6 +16,7 @@ export function createRepositories(db: Queryable): Repositories {
     quotas: new PostgresQuotaRepository(db),
     usage: new PostgresUsageRepository(db),
     signupRequests: new PostgresSignupRequestRepository(db),
+    refreshTokens: new PostgresRefreshTokenRepository(db),
   };
 }
 

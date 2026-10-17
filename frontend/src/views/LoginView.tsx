@@ -8,6 +8,7 @@ import { apiConfig, isMockMode } from '@/services/api/apiConfig';
 import { describeError } from '@/services/api/apiErrors';
 import { roleOf, type SessionRole } from '@/services/api/credentials';
 import { DEMO_API_KEY, MOCK_ADMIN_TOKEN } from '@/services/mock/mockSeed';
+import { PageSkeleton } from '@/widgets/common/LoadingSkeleton';
 import { AuthLayout } from '@/widgets/layout/AuthLayout';
 import { Button } from '@/widgets/ui/Button';
 import { Card } from '@/widgets/ui/Card';
@@ -34,6 +35,7 @@ export default function LoginView() {
 
   // Already signed in when arriving here -> straight to your interface. (After signing in on this
   // page, onSuccess navigates to the requested page instead.)
+  if (session.status === 'restoring') return <PageSkeleton />;
   if (current && signIn.isIdle) return <Navigate to={homeFor(current)} replace />;
 
   const demoKey = apiConfig.demoApiKey ?? (isMockMode ? DEMO_API_KEY : null);

@@ -15,6 +15,7 @@ async function main(): Promise<void> {
     pool,
     // Only called while serving requests, i.e. after `app` exists.
     onTransactionRetry: (attempt, code) => app.log.warn({ attempt, code }, 'transaction retried after a deadlock/serialization failure'),
+    onRefreshReuse: (familyId) => app.log.warn({ familyId }, 'refresh token reused: session revoked'),
   });
   const app = await buildApp(container);
   await waitForDatabase(pool, (attempt, error) => app.log.warn({ attempt, err: error.message }, 'database not reachable yet; retrying'));

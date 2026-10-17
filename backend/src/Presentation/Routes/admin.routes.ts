@@ -16,7 +16,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../../container';
 import { accountNotFound } from '../../Domain/Accounts/AccountErrors';
-import { requireAdmin } from '../../Shared/Middleware/auth';
+import { requireOperator } from '../../Shared/Middleware/auth';
 import { validate } from '../../Shared/Validation/validate';
 import { accountIdParams, monthQuery, signupRequestParams, userIdParams } from '../Schemas/params';
 
@@ -28,7 +28,7 @@ const accountUserParams = accountIdParams.extend(userIdParams.shape);
 
 export function registerAdminRoutes(app: FastifyInstance, container: Container): void {
   app.register(async (admin) => {
-    admin.addHook('preHandler', requireAdmin(container.config.ADMIN_API_TOKEN));
+    admin.addHook('preHandler', requireOperator((token) => container.auth.verify(token)));
 
     admin.post('/admin/accounts', { config: { rateLimit: { max: container.config.ACCOUNT_CREATE_RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' } } }, async (request, reply) => {
       const result = await container.accounts.create.execute(validate(createAccountSchema, request.body));

@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -17,7 +18,7 @@ import { registerQuotaRoutes } from './Presentation/Routes/quotas.routes';
 import { registerSignupRoutes } from './Presentation/Routes/signup.routes';
 import { registerUsageRoutes } from './Presentation/Routes/usage.routes';
 import { registerUserRoutes } from './Presentation/Routes/users.routes';
-import { requireApiKey } from './Shared/Middleware/auth';
+import { requireAccount } from './Shared/Middleware/auth';
 import { AuthFailureLimiter } from './Shared/Middleware/authFailureLimiter';
 import { generateRequestId } from './Shared/Middleware/requestId';
 
@@ -63,10 +64,14 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
   await app.register(cors, {
     origin: config.CORS_ORIGINS,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-Id', 'X-Requested-With'],
+    // The refresh cookie is sent only to the same origin in the web app; credentials are allowed
+    // for listed origins that call the API directly (e.g. a dev server on another port).
+    credentials: true,
     exposedHeaders: ['X-Request-Id', 'Idempotent-Replayed'],
   });
   // Opt-in per route (AI advisor, account creation) so the hot consume path is not throttled here.
+  await app.register(cookie);
   await app.register(rateLimit, { global: false });
 
   await app.register(swagger, { mode: 'static', specification: { document: buildOpenApiDocument(API_PREFIX) as never } });
@@ -79,11 +84,11 @@ export async function buildApp(container: Container, options: BuildAppOptions = 
       registerHealthRoutes(api, container);
       registerAdminRoutes(api, container);
       registerAiRoutes(api, container);
-      registerAuthRoutes(api, container);
+      registerAuthRoutes(api, container, API_PREFIX);
       registerSignupRoutes(api, container);
-      // Account scope: every route below requires X-API-Key.
+      // Account scope: an account JWT access token or the account API key (X-API-Key).
       await api.register(async (accountScope) => {
-        accountScope.addHook('preHandler', requireApiKey((key) => container.accounts.authenticate.execute(key)));
+        accountScope.addHook('preHandler', requireAccount((key) => container.accounts.authenticate.execute(key), (token) => container.auth.verify(token)));
         registerAccountRoutes(accountScope, container);
         registerUserRoutes(accountScope, container);
         registerPlanRoutes(accountScope, container);

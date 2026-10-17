@@ -33,10 +33,16 @@ const url = new URL(API_URL);
 const origin = url.origin;
 const prefix = url.pathname;
 
+let operatorAccessToken = null;
+
 async function api(method, path, { key, admin, body } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (key) headers['x-api-key'] = key;
-  if (admin) headers.authorization = `Bearer ${ADMIN_API_TOKEN}`;
+  if (admin) {
+    // Operator endpoints take a JWT: sign in once with the operator token (POST /auth/token).
+    operatorAccessToken ??= (await api('POST', '/auth/token', { body: { token: ADMIN_API_TOKEN } })).accessToken;
+    headers.authorization = `Bearer ${operatorAccessToken}`;
+  }
   const response = await fetch(`${API_URL}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const json = await response.json();
   if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${JSON.stringify(json)}`);

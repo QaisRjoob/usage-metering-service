@@ -5,7 +5,9 @@ export const endpoints = {
   health: '/health',
 
   auth: {
-    identify: '/auth/identify',
+    token: '/auth/token',
+    refresh: '/auth/refresh',
+    logout: '/auth/logout',
   },
 
   signup: {

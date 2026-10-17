@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { useCredentials } from '@/hooks/useCredentials';
 import { roleOf, type SessionRole } from '@/services/api/credentials';
+import { PageSkeleton } from '@/widgets/common/LoadingSkeleton';
 import { homeFor, routePaths } from './routePaths';
 
 /**
@@ -13,6 +14,8 @@ export function RequireRole({ role, children }: { role: SessionRole; children: R
   const session = useCredentials();
   const location = useLocation();
   const current = roleOf(session);
+  // A reloaded tab is getting a fresh access token from the refresh cookie: wait, do not redirect.
+  if (session.status === 'restoring') return <PageSkeleton />;
   if (!current) {
     const next = encodeURIComponent(`${location.pathname}${location.search}`);
     return <Navigate to={`${routePaths.login}?next=${next}`} replace />;
@@ -23,6 +26,8 @@ export function RequireRole({ role, children }: { role: SessionRole; children: R
 
 /** "/" sends people to their own interface, or to the login page. */
 export function HomeRedirect() {
-  const current = roleOf(useCredentials());
+  const session = useCredentials();
+  if (session.status === 'restoring') return <PageSkeleton />;
+  const current = roleOf(session);
   return <Navigate to={current ? homeFor(current) : routePaths.login} replace />;
 }

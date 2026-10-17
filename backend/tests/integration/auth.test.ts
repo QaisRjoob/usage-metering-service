@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TEST_DEMO_API_KEY, adminHeaders, createAccount, createTestContext, keyHeaders, type TestContext } from '../support/testApp';
+import { TEST_ADMIN_TOKEN, TEST_DEMO_API_KEY, adminHeaders, createAccount, createTestContext, keyHeaders, type TestContext } from '../support/testApp';
 
 let ctx: TestContext;
 beforeAll(async () => {
@@ -46,13 +46,20 @@ describe('API key validation', () => {
   });
 });
 
-describe('admin token', () => {
-  it('protects /admin with 401 for missing or wrong tokens', async () => {
+describe('operator access (JWT)', () => {
+  it('protects /admin with 401 for missing or invalid access tokens', async () => {
     const missing = await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/accounts' });
-    expect(missing.json()).toMatchObject({ error: { code: 'ADMIN_TOKEN_MISSING' } });
+    expect(missing.json()).toMatchObject({ error: { code: 'TOKEN_MISSING' } });
     const wrong = await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/accounts', headers: { authorization: 'Bearer nope-nope-nope-nope' } });
     expect(wrong.statusCode).toBe(401);
-    expect(wrong.json()).toMatchObject({ error: { code: 'ADMIN_TOKEN_INVALID' } });
+    expect(wrong.json()).toMatchObject({ error: { code: 'TOKEN_INVALID' } });
+  });
+
+  it('does not accept the operator token itself on /admin (only the JWT it is exchanged for)', async () => {
+    const raw = await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/accounts', headers: { authorization: `Bearer ${TEST_ADMIN_TOKEN}` } });
+    expect(raw.statusCode).toBe(401);
+    expect(raw.json()).toMatchObject({ error: { code: 'TOKEN_INVALID' } });
+    expect((await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/accounts', headers: adminHeaders })).statusCode).toBe(200);
   });
 
   it('an account API key does not open admin endpoints', async () => {
@@ -61,10 +68,10 @@ describe('admin token', () => {
     expect(response.statusCode).toBe(401);
   });
 
-  it('the admin token does not open account-scoped endpoints', async () => {
+  it('an operator access token does not open account-scoped endpoints', async () => {
     const response = await ctx.app.inject({ method: 'GET', url: '/api/v1/users', headers: adminHeaders });
-    expect(response.statusCode).toBe(401);
-    expect(response.json()).toMatchObject({ error: { code: 'API_KEY_MISSING' } });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: 'INSUFFICIENT_ROLE' } });
   });
 });
 

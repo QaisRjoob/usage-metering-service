@@ -1,7 +1,7 @@
 import type { ErrorCode } from '../../contracts';
 
-/** Errors that mean "a credential was presented and it was wrong" (not merely missing). */
-export const CREDENTIAL_FAILURE_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['ADMIN_TOKEN_INVALID', 'API_KEY_INVALID', 'CREDENTIAL_INVALID', 'SIGNUP_REQUEST_NOT_FOUND']);
+/** Errors that mean "a credential was presented and it was wrong" (not merely missing or expired). */
+export const CREDENTIAL_FAILURE_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['TOKEN_INVALID', 'API_KEY_INVALID', 'CREDENTIAL_INVALID', 'SIGNUP_REQUEST_NOT_FOUND']);
 
 /**
  * Throttles credential guessing per client IP: after `maxFailures` wrong credentials (admin token,

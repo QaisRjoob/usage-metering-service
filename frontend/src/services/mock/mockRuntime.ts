@@ -7,7 +7,7 @@ import type { ZodType } from 'zod';
 import { ApiError } from '@/services/api/apiErrors';
 import { credentials } from '@/services/api/credentials';
 import { MockDatabase, type AccountRow } from './mockDatabase';
-import { MOCK_ADMIN_TOKEN, seedMockDatabase } from './mockSeed';
+import { seedMockDatabase } from './mockSeed';
 
 let database: MockDatabase | null = null;
 let latency = { min: 120, max: 320 };
@@ -47,17 +47,26 @@ function httpError(status: number, code: (typeof ERROR_CODES)[keyof typeof ERROR
   return new ApiError({ kind: 'http', status, code, message, requestId: 'mock', details });
 }
 
-export function requireAdmin(explicitToken?: string): void {
-  const token = explicitToken ?? credentials.get().adminToken;
-  if (!token) throw httpError(401, ERROR_CODES.ADMIN_TOKEN_MISSING, 'Missing admin token. Send Authorization: Bearer <token>.');
-  if (token !== MOCK_ADMIN_TOKEN) throw httpError(401, ERROR_CODES.ADMIN_TOKEN_INVALID, 'Invalid admin token.');
+/** Mock access tokens: markers the mock services check, like the API checks a JWT's role and subject. */
+export const mockOperatorAccessToken = 'mock-access.operator';
+export const mockAccountAccessToken = (accountId: string) => `mock-access.account.${accountId}`;
+const ACCOUNT_TOKEN_PREFIX = 'mock-access.account.';
+
+/** Operator endpoints: an operator access token (same codes as the API). */
+export function requireAdmin(): void {
+  const token = credentials.get().accessToken;
+  if (!token) throw httpError(401, ERROR_CODES.TOKEN_MISSING, 'Missing access token. Sign in first.');
+  if (token.startsWith(ACCOUNT_TOKEN_PREFIX)) throw httpError(403, ERROR_CODES.INSUFFICIENT_ROLE, 'This endpoint is for the operator.');
+  if (token !== mockOperatorAccessToken) throw httpError(401, ERROR_CODES.TOKEN_INVALID, 'Invalid access token.');
 }
 
-export function requireAccount(db: MockDatabase, explicitKey?: string): AccountRow {
-  const apiKey = explicitKey ?? credentials.get().account?.apiKey;
-  if (!apiKey) throw httpError(401, ERROR_CODES.API_KEY_MISSING, 'Missing API key. Send it in the X-API-Key header.');
-  const account = db.findAccountByKey(apiKey);
-  if (!account) throw httpError(401, ERROR_CODES.API_KEY_INVALID, 'Invalid API key.');
+/** Account endpoints: an account access token; the account comes from the token's subject. */
+export function requireAccount(db: MockDatabase): AccountRow {
+  const token = credentials.get().accessToken;
+  if (!token) throw httpError(401, ERROR_CODES.API_KEY_MISSING, 'Missing credential. Sign in first.');
+  if (token === mockOperatorAccessToken) throw httpError(403, ERROR_CODES.INSUFFICIENT_ROLE, 'This endpoint is for an account (company) session.');
+  const account = token.startsWith(ACCOUNT_TOKEN_PREFIX) ? db.accounts.get(token.slice(ACCOUNT_TOKEN_PREFIX.length)) : undefined;
+  if (!account) throw httpError(401, ERROR_CODES.TOKEN_INVALID, 'Invalid access token.');
   return account;
 }
 

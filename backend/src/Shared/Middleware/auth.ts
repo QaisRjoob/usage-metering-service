@@ -1,18 +1,21 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AuthenticatedAccount } from '../../Domain/Accounts/Account';
-import { adminTokenInvalid, adminTokenMissing } from '../../Domain/Accounts/AccountErrors';
+import { apiKeyMissing } from '../../Domain/Accounts/AccountErrors';
+import { insufficientRole, tokenMissing, type Principal } from '../../Domain/Auth/AuthTokens';
 
 export const API_KEY_HEADER = 'x-api-key';
 
 type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+type AuthenticateKey = (rawKey: string | undefined) => Promise<AuthenticatedAccount>;
+type VerifyToken = (token: string) => Promise<Principal>;
 
 function headerValue(request: FastifyRequest, name: string): string | undefined {
   const value = request.headers[name];
   return Array.isArray(value) ? value[0] : value;
 }
 
-function bearerToken(request: FastifyRequest): string | undefined {
+export function bearerToken(request: FastifyRequest): string | undefined {
   const header = headerValue(request, 'authorization');
   const match = header?.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim();
@@ -24,32 +27,62 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(digest(a), digest(b));
 }
 
-/** Account scope: resolves X-API-Key to request.account, or answers 401. */
-export function requireApiKey(authenticate: (rawKey: string | undefined) => Promise<AuthenticatedAccount>): PreHandler {
-  return async (request) => {
-    request.account = await authenticate(headerValue(request, API_KEY_HEADER));
-  };
+function setAccount(request: FastifyRequest, principal: Extract<Principal, { role: 'account' }>): void {
+  request.account = { id: principal.accountId, name: principal.accountName };
+  request.role = 'account';
 }
 
-/** Operator scope: Authorization: Bearer <ADMIN_API_TOKEN>, or 401. */
-export function requireAdmin(adminToken: string): PreHandler {
+/**
+ * Operator routes: a JWT access token with role "operator" (from POST /auth/token with the operator
+ * token). The operator token itself is not accepted here.
+ */
+export function requireOperator(verify: VerifyToken): PreHandler {
   return async (request) => {
     const token = bearerToken(request);
-    if (!token) throw adminTokenMissing();
-    if (!safeEqual(token, adminToken)) throw adminTokenInvalid();
-    request.isAdmin = true;
+    if (!token) throw tokenMissing();
+    const principal = await verify(token);
+    if (principal.role !== 'operator') throw insufficientRole('operator');
+    request.role = 'operator';
   };
 }
 
 /**
- * Either credential (used by the AI advisor). An API key wins and limits the answer to that
- * account; the admin token allows cross-account answers.
+ * Account routes: an account JWT access token, or the account API key in X-API-Key (for
+ * server-to-server client applications, as the brief requires). Either way the account comes
+ * from the credential, never from the request body or URL.
  */
-export function requireApiKeyOrAdmin(authenticate: (rawKey: string | undefined) => Promise<AuthenticatedAccount>, adminToken: string): PreHandler {
-  const viaKey = requireApiKey(authenticate);
-  const viaAdmin = requireAdmin(adminToken);
-  return async (request, reply) => {
-    if (headerValue(request, API_KEY_HEADER) !== undefined || bearerToken(request) === undefined) return viaKey(request, reply);
-    return viaAdmin(request, reply);
+export function requireAccount(authenticateKey: AuthenticateKey, verify: VerifyToken): PreHandler {
+  return async (request) => {
+    const apiKey = headerValue(request, API_KEY_HEADER);
+    if (apiKey !== undefined) {
+      request.account = await authenticateKey(apiKey);
+      request.role = 'account';
+      return;
+    }
+    const token = bearerToken(request);
+    if (!token) throw apiKeyMissing();
+    const principal = await verify(token);
+    if (principal.role !== 'account') throw insufficientRole('account');
+    setAccount(request, principal);
+  };
+}
+
+/**
+ * Either role (AI advisor): an API key or account token limits the answer to that account; an
+ * operator token allows cross-account answers.
+ */
+export function requireAnyRole(authenticateKey: AuthenticateKey, verify: VerifyToken): PreHandler {
+  return async (request) => {
+    const apiKey = headerValue(request, API_KEY_HEADER);
+    if (apiKey !== undefined) {
+      request.account = await authenticateKey(apiKey);
+      request.role = 'account';
+      return;
+    }
+    const token = bearerToken(request);
+    if (!token) throw apiKeyMissing();
+    const principal = await verify(token);
+    if (principal.role === 'account') setAccount(request, principal);
+    else request.role = 'operator';
   };
 }

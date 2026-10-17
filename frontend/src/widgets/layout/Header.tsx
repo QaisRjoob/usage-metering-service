@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router';
 import { useCredentials } from '@/hooks/useCredentials';
 import { routePaths } from '@/routing/routePaths';
 import { isMockMode } from '@/services/api/apiConfig';
-import { credentials, roleOf } from '@/services/api/credentials';
+import { useCredentialActions } from '@/hooks/useCredentialActions';
+import { roleOf } from '@/services/api/credentials';
 import { Badge } from '@/widgets/ui/Badge';
 import { ThemeToggle } from '@/widgets/ui/ThemeToggle';
 import { OperatorFinder } from './OperatorFinder';
@@ -14,9 +15,10 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
   const session = useCredentials();
   const navigate = useNavigate();
   const role = roleOf(session);
+  const { signOut: endSession } = useCredentialActions();
 
-  const signOut = () => {
-    credentials.clearAll();
+  const signOut = async () => {
+    await endSession();
     navigate(routePaths.login, { replace: true });
   };
 
@@ -49,7 +51,7 @@ export function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
           </span>
         )}
         <ThemeToggle />
-        <Button variant="outline" size="sm" onClick={signOut}>
+        <Button variant="outline" size="sm" onClick={() => void signOut()}>
           <LogOut className="size-3.5" aria-hidden="true" /> Sign out
         </Button>
       </div>

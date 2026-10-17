@@ -2,12 +2,25 @@ import { createHash } from 'node:crypto';
 import { aiAdvisorRequestSchema } from '../../contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Container } from '../../container';
-import { API_KEY_HEADER, requireApiKeyOrAdmin } from '../../Shared/Middleware/auth';
+import { API_KEY_HEADER, bearerToken, requireAnyRole } from '../../Shared/Middleware/auth';
 import { validate } from '../../Shared/Validation/validate';
 
-/** Rate-limit bucket per credential (hashed, so keys never end up in memory maps as-is), else per IP. */
+/**
+ * Rate-limit bucket per caller, computed before authentication: the subject of a bearer token
+ * (so a refreshed token keeps the same bucket), else the hashed API key, else the client IP.
+ * A forged token only picks a bucket; it is rejected by the preHandler right after.
+ */
 function rateLimitKey(request: FastifyRequest): string {
-  const credential = request.headers[API_KEY_HEADER] ?? request.headers.authorization;
+  const token = bearerToken(request);
+  if (token) {
+    try {
+      const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')) as { sub?: unknown };
+      if (typeof payload.sub === 'string') return `sub:${payload.sub}`;
+    } catch {
+      // not a JWT: fall through to the hashed credential
+    }
+  }
+  const credential = request.headers[API_KEY_HEADER] ?? token;
   const value = Array.isArray(credential) ? credential[0] : credential;
   return value ? createHash('sha256').update(value).digest('hex').slice(0, 32) : request.ip;
 }
@@ -17,7 +30,7 @@ export function registerAiRoutes(app: FastifyInstance, container: Container): vo
   app.post(
     '/ai/advisor',
     {
-      preHandler: requireApiKeyOrAdmin((key) => container.accounts.authenticate.execute(key), config.ADMIN_API_TOKEN),
+      preHandler: requireAnyRole((key) => container.accounts.authenticate.execute(key), (token) => container.auth.verify(token)),
       config: { rateLimit: { max: config.AI_RATE_LIMIT_PER_WINDOW, timeWindow: config.AI_RATE_LIMIT_WINDOW_MS, keyGenerator: rateLimitKey } },
     },
     async (request) => {

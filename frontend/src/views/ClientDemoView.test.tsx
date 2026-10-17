@@ -1,15 +1,14 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { credentials } from '@/services/api/credentials';
 import { resetMockDb } from '@/services/mock/mockRuntime';
-import { DEMO_ACCOUNT_ID, DEMO_API_KEY } from '@/services/mock/mockSeed';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { signInAsAccount } from '@/test/session';
 import ClientDemoView from './ClientDemoView';
 
 beforeEach(() => {
   resetMockDb();
-  credentials.setAccount({ apiKey: DEMO_API_KEY, accountId: DEMO_ACCOUNT_ID, accountName: 'شركة الوثائق التجريبية', apiKeyPrefix: 'umk_demo_loca' });
+  signInAsAccount();
 });
 
 const decisionRegion = () => screen.getByText('Decision').closest('div.rounded-xl') as HTMLElement;

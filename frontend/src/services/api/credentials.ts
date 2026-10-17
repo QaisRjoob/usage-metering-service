@@ -1,73 +1,66 @@
 /**
- * Holds the operator's admin token and the connected account's API key.
+ * The signed-in session: a JWT access token and who it belongs to.
  *
- * Secrets live in memory and in sessionStorage only (cleared when the tab closes). They are never
- * written to localStorage, URLs or TanStack Query keys. Query keys use `account.accountId` as the
- * cache scope instead of the key itself.
+ * The access token lives in memory only - never in localStorage, sessionStorage, URLs or TanStack
+ * Query keys - so a script that reads storage finds no credential. The refresh token is an
+ * HttpOnly cookie the page cannot read at all. After a reload the session is restored by asking
+ * the server for a new access token (POST /auth/refresh); a non-secret hint in sessionStorage
+ * only says "there was a session in this tab, try to restore it".
  */
+import type { SessionAccount as ApiSessionAccount, TokenResponse } from '@/contracts';
 
-export interface AccountCredential {
-  apiKey: string;
+/** Who is signed in. Exactly one role at a time: the operator or one account (company). */
+export type SessionRole = 'operator' | 'account';
+
+export interface SessionAccount {
   accountId: string;
   accountName: string;
   apiKeyPrefix: string;
 }
 
 export interface CredentialsState {
-  adminToken: string | null;
-  account: AccountCredential | null;
+  accessToken: string | null;
+  /** Epoch milliseconds when the access token expires. */
+  expiresAt: number | null;
+  role: SessionRole | null;
+  account: SessionAccount | null;
+  /** "restoring" while a reloaded tab asks the server for a fresh access token. */
+  status: 'restoring' | 'ready';
 }
 
-const STORAGE_KEY = 'umqs.credentials';
-const EMPTY_STATE: CredentialsState = { adminToken: null, account: null };
+const HINT_KEY = 'umqs.session-hint';
+const EMPTY_STATE: CredentialsState = { accessToken: null, expiresAt: null, role: null, account: null, status: 'ready' };
 
-function isAccountCredential(value: unknown): value is AccountCredential {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return ['apiKey', 'accountId', 'accountName', 'apiKeyPrefix'].every((field) => typeof candidate[field] === 'string');
-}
-
-function load(): CredentialsState {
+function readHint(): boolean {
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY_STATE;
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return EMPTY_STATE;
-    const record = parsed as Record<string, unknown>;
-    return {
-      adminToken: typeof record.adminToken === 'string' && record.adminToken ? record.adminToken : null,
-      account: isAccountCredential(record.account) ? record.account : null,
-    };
+    return window.sessionStorage.getItem(HINT_KEY) === '1';
   } catch {
-    return EMPTY_STATE;
+    return false;
   }
 }
 
-function persist(state: CredentialsState): void {
+function writeHint(present: boolean): void {
   try {
-    if (!state.adminToken && !state.account) window.sessionStorage.removeItem(STORAGE_KEY);
-    else window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (present) window.sessionStorage.setItem(HINT_KEY, '1');
+    else window.sessionStorage.removeItem(HINT_KEY);
   } catch {
-    // Storage can be unavailable (private mode, blocked storage); memory state still works.
+    // Storage unavailable: a reload then simply shows the login page.
   }
 }
 
-let state: CredentialsState = typeof window === 'undefined' ? EMPTY_STATE : load();
+let state: CredentialsState = typeof window !== 'undefined' && readHint() ? { ...EMPTY_STATE, status: 'restoring' } : EMPTY_STATE;
 const listeners = new Set<() => void>();
 
 function update(next: CredentialsState): void {
   state = next;
-  persist(state);
   listeners.forEach((listener) => listener());
 }
 
-/** Who is signed in. Exactly one role at a time: an operator or one account (company). */
-export type SessionRole = 'operator' | 'account';
+const toAccount = (account: ApiSessionAccount | undefined): SessionAccount | null =>
+  account ? { accountId: account.id, accountName: account.name, apiKeyPrefix: account.apiKeyPrefix } : null;
 
 export function roleOf(current: CredentialsState): SessionRole | null {
-  if (current.adminToken) return 'operator';
-  if (current.account) return 'account';
-  return null;
+  return current.accessToken ? current.role : null;
 }
 
 export const credentials = {
@@ -78,17 +71,25 @@ export const credentials = {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
-  /** Signs in as the operator. Any account session is ended: the roles never mix. */
-  setAdminToken(token: string | null): void {
-    const adminToken = token?.trim() || null;
-    update({ adminToken, account: adminToken ? null : state.account });
+  /** Stores a new session (sign-in or refresh). Signing in as one role ends the other. */
+  setSession(session: Pick<TokenResponse, 'accessToken' | 'expiresIn' | 'role' | 'account'>): void {
+    writeHint(true);
+    update({
+      accessToken: session.accessToken,
+      expiresAt: Date.now() + session.expiresIn * 1000,
+      role: session.role,
+      account: session.role === 'account' ? toAccount(session.account) : null,
+      status: 'ready',
+    });
   },
-  /** Signs in as an account (company). Any operator session is ended. */
-  setAccount(account: AccountCredential | null): void {
-    update({ adminToken: account ? null : state.adminToken, account });
+  /** A reloaded tab could not be restored (no or expired refresh cookie). */
+  restoreFailed(): void {
+    writeHint(false);
+    update(EMPTY_STATE);
   },
-  /** Sign out. */
+  /** Sign out (the caller also revokes the refresh token on the server). */
   clearAll(): void {
+    writeHint(false);
     update(EMPTY_STATE);
   },
 };

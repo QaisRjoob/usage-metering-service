@@ -5,6 +5,8 @@ import { AssignAccountPlanCommand } from './Application/Modules/Accounts/Command
 import { CreateAccountCommand } from './Application/Modules/Accounts/Commands/CreateAccountCommand';
 import { AuthenticateApiKeyQuery } from './Application/Modules/Accounts/Queries/AuthenticateApiKeyQuery';
 import { IdentifyCredentialQuery } from './Application/Modules/Accounts/Queries/IdentifyCredentialQuery';
+import { IssueTokenCommand, RefreshTokenCommand, RevokeSessionCommand } from './Application/Modules/Auth/AuthUseCases';
+import { JoseAccessTokenService } from './Infrastructure/Auth/JoseAccessTokenService';
 import { GetAccountDetailsQuery } from './Application/Modules/Accounts/Queries/GetAccountDetailsQuery';
 import { GetCurrentAccountQuery } from './Application/Modules/Accounts/Queries/GetCurrentAccountQuery';
 import { ListAccountsQuery } from './Application/Modules/Accounts/Queries/ListAccountsQuery';
@@ -39,8 +41,12 @@ export interface ContainerOptions {
   config: AppConfig;
   pool: Pool;
   clock?: Clock;
+  /** Clock for token lifetimes (default: system time). */
+  authClock?: Clock;
   aiProvider?: AIProvider;
   onTransactionRetry?: (attempt: number, code: string) => void;
+  /** Called when a used refresh token is presented again (its whole session was revoked). */
+  onRefreshReuse?: (familyId: string) => void;
 }
 
 /**
@@ -58,6 +64,11 @@ export function createContainer(options: ContainerOptions) {
 
   const apiKeyCache = new CachedApiKeyAccountRepository(repos.accounts);
   const authenticate = new AuthenticateApiKeyQuery(apiKeyCache);
+  const identify = new IdentifyCredentialQuery(authenticate, (token) => safeEqual(token, config.ADMIN_API_TOKEN));
+  // Token lifetimes follow real time; tests move `clock` across months for quota periods only.
+  const authClock = options.authClock ?? systemClock;
+  const accessTokens = new JoseAccessTokenService(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SECONDS, authClock);
+  const refreshTtlMs = config.REFRESH_TOKEN_TTL_DAYS * 86_400_000;
   const accountUsageSummary = new GetAccountUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
   const adminAnalytics = new GetAdminAnalyticsQuery(analytics, repos.accounts, repos.usage, clock);
   const userUsageSummary = new GetUserUsageSummaryQuery(repos.accounts, repos.users, repos.usage, clock);
@@ -67,9 +78,14 @@ export function createContainer(options: ContainerOptions) {
     pool,
     clock,
     aiProvider,
+    auth: {
+      issue: new IssueTokenCommand(identify, accessTokens, repos.refreshTokens, authClock, refreshTtlMs),
+      refresh: new RefreshTokenCommand(transactions, accessTokens, authClock, refreshTtlMs, options.onRefreshReuse),
+      logout: new RevokeSessionCommand(transactions, authClock),
+      verify: (token: string) => accessTokens.verify(token),
+    },
     accounts: {
       authenticate,
-      identify: new IdentifyCredentialQuery(authenticate, (token) => safeEqual(token, config.ADMIN_API_TOKEN)),
       create: new CreateAccountCommand(repos.accounts, repos.plans, clock),
       assignPlan: new AssignAccountPlanCommand(transactions, clock),
       getCurrent: new GetCurrentAccountQuery(repos.accounts, repos.plans, clock),

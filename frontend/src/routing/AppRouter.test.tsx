@@ -5,10 +5,9 @@ import { credentials } from '@/services/api/credentials';
 import { resetMockDb } from '@/services/mock/mockRuntime';
 import { DEMO_ACCOUNT_ID, DEMO_API_KEY, MOCK_ADMIN_TOKEN } from '@/services/mock/mockSeed';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { signInAsAccount, signInAsOperator } from '@/test/session';
 import { AppRouter } from './AppRouter';
 
-const signInAsOperator = () => credentials.setAdminToken(MOCK_ADMIN_TOKEN);
-const signInAsAccount = () => credentials.setAccount({ apiKey: DEMO_API_KEY, accountId: DEMO_ACCOUNT_ID, accountName: 'شركة الوثائق التجريبية', apiKeyPrefix: 'umk_demo_loca' });
 
 beforeEach(() => {
   resetMockDb();
@@ -70,19 +69,25 @@ describe('role separation', () => {
     expect(await screen.findByLabelText('Access token or API key')).toBeInTheDocument();
   });
 
-  it('ends the session and returns to the login page when the server rejects the stored token', async () => {
-    credentials.setAdminToken('a-token-the-server-no-longer-accepts');
+  it('ends the session and returns to the login page when the server rejects the access token', async () => {
+    credentials.setSession({ accessToken: 'a-token-the-server-does-not-accept', expiresIn: 900, role: 'operator' });
     renderWithProviders(<AppRouter />, { route: '/admin/accounts' });
     expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back' }, { timeout: 15_000 })).toBeInTheDocument();
-    expect(credentials.get().adminToken).toBeNull();
+    expect(credentials.get().accessToken).toBeNull();
   });
 
   it('signing in as one role ends the other session', () => {
     signInAsOperator();
     signInAsAccount();
-    expect(credentials.get().adminToken).toBeNull();
+    expect(credentials.get().role).toBe('account');
     signInAsOperator();
-    expect(credentials.get().account).toBeNull();
+    expect(credentials.get()).toMatchObject({ role: 'operator', account: null });
+  });
+
+  it('keeps the access token in memory only (nothing secret in web storage)', () => {
+    signInAsOperator();
+    const stored = JSON.stringify({ ...window.sessionStorage }) + JSON.stringify({ ...window.localStorage });
+    expect(stored).not.toContain(credentials.get().accessToken!);
   });
 });
 
@@ -96,7 +101,9 @@ describe('single-field login (the server decides the interface)', () => {
     await user.type(await field(), MOCK_ADMIN_TOKEN);
     await user.click(signIn());
     expect(await screen.findByRole('heading', { level: 1, name: 'Plan catalogue' })).toBeInTheDocument();
-    expect(credentials.get().adminToken).toBe(MOCK_ADMIN_TOKEN);
+    // The operator token was exchanged for an access token; the token itself is not kept.
+    expect(credentials.get()).toMatchObject({ role: 'operator', accessToken: 'mock-access.operator' });
+    expect(JSON.stringify(credentials.get())).not.toContain(MOCK_ADMIN_TOKEN);
   });
 
   it('opens the account portal for a company API key, and signs out again', async () => {
@@ -106,9 +113,10 @@ describe('single-field login (the server decides the interface)', () => {
     await user.click(signIn());
     expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, شركة الوثائق التجريبية' })).toBeInTheDocument();
     expect(credentials.get().account?.accountName).toBe('شركة الوثائق التجريبية');
+    expect(JSON.stringify(credentials.get())).not.toContain(DEMO_API_KEY);
     await user.click(screen.getByRole('button', { name: /Sign out/ }));
     expect(await field()).toBeInTheDocument();
-    expect(credentials.get().account).toBeNull();
+    expect(credentials.get()).toMatchObject({ accessToken: null, account: null });
   });
 
   it('ignores a requested page that belongs to the other interface', async () => {
@@ -125,7 +133,7 @@ describe('single-field login (the server decides the interface)', () => {
     await user.type(await field(), 'umk_live_not_a_real_key_at_all');
     await user.click(signIn());
     expect(await screen.findByText('This is neither a valid API key nor the operator token.')).toBeInTheDocument();
-    expect(credentials.get()).toEqual({ adminToken: null, account: null });
+    expect(credentials.get()).toMatchObject({ accessToken: null, role: null, account: null });
   });
 });
 

@@ -7,7 +7,7 @@ import { queryKeys, staleTimes } from '@/utils/queryKeys';
 
 export function useDashboardViewModel() {
   const { analytics } = useServices();
-  const { adminToken } = useCredentials();
+  const { accessToken, role } = useCredentials();
   const params = useSearchParamState();
   const monthParam = params.get('month');
   const month = isValidMonth(monthParam) ? monthParam : currentUtcMonth();
@@ -15,7 +15,7 @@ export function useDashboardViewModel() {
   const query = useQuery({
     queryKey: queryKeys.admin.summary(month),
     queryFn: () => analytics.getAdminSummary(month),
-    enabled: Boolean(adminToken),
+    enabled: Boolean(accessToken) && role === 'operator',
     staleTime: staleTimes.summary,
     placeholderData: keepPreviousData,
   });

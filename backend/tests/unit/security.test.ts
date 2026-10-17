@@ -26,16 +26,21 @@ describe('AuthFailureLimiter', () => {
 });
 
 describe('securityWarnings', () => {
-  const base = { DATABASE_URL: 'postgres://x', ADMIN_API_TOKEN: 'local-admin-token-change-me' };
+  const base = { DATABASE_URL: 'postgres://x', ADMIN_API_TOKEN: 'local-admin-token-change-me', JWT_SECRET: 'local-jwt-secret-change-me-0123456789abcdef' };
 
   it('stays quiet outside production', () => {
     expect(securityWarnings(loadConfig({ ...base, NODE_ENV: 'development' }))).toEqual([]);
   });
 
-  it('flags demo secrets and demo data in production', () => {
+  it('flags demo secrets, insecure cookies and demo data in production', () => {
     const warnings = securityWarnings(loadConfig({ ...base, NODE_ENV: 'production', SEED_DEMO_DATA: 'true' }));
-    expect(warnings).toHaveLength(2);
-    expect(securityWarnings(loadConfig({ ...base, NODE_ENV: 'production', SEED_DEMO_DATA: 'false', ADMIN_API_TOKEN: 'x'.repeat(48) }))).toEqual([]);
+    expect(warnings.map((warning) => warning.split(' ')[0])).toEqual(['ADMIN_API_TOKEN', 'JWT_SECRET', 'COOKIE_SECURE', 'SEED_DEMO_DATA']);
+    const hardened = { ...base, NODE_ENV: 'production', SEED_DEMO_DATA: 'false', ADMIN_API_TOKEN: 'x'.repeat(48), JWT_SECRET: 'y'.repeat(48), COOKIE_SECURE: 'true' };
+    expect(securityWarnings(loadConfig(hardened))).toEqual([]);
+  });
+
+  it('requires a JWT secret of at least 32 characters', () => {
+    expect(() => loadConfig({ ...base, JWT_SECRET: 'too-short' })).toThrow(/JWT_SECRET/);
   });
 
   it('does not trust proxy headers unless configured', () => {

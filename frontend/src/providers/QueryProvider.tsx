@@ -9,14 +9,15 @@ import { credentials } from '@/services/api/credentials';
  * quota and usage values are refreshed after a few seconds; plans and account lists live longer.
  */
 /**
- * The stored credential was rejected (wrong or replaced admin token, or an API key that no longer
- * exists): end the session, so the route guard sends the user back to the login page instead of
- * leaving them on pages that can only fail. Missing credentials and login errors do not count.
+ * The session was rejected (an invalid access token, a refresh that failed, or an account that no
+ * longer exists): end it, so the route guard sends the user back to the login page instead of
+ * leaving them on pages that can only fail. An expired access token is refreshed by the API client
+ * before it gets here; missing credentials and login errors do not count.
  */
+const SESSION_ENDING_CODES = new Set<string>([ERROR_CODES.TOKEN_INVALID, ERROR_CODES.REFRESH_TOKEN_INVALID, ERROR_CODES.API_KEY_INVALID]);
+
 function endSessionOnRejectedCredential(error: unknown): void {
-  if (isApiError(error) && error.status === 401 && (error.code === ERROR_CODES.ADMIN_TOKEN_INVALID || error.code === ERROR_CODES.API_KEY_INVALID)) {
-    credentials.clearAll();
-  }
+  if (isApiError(error) && error.status === 401 && SESSION_ENDING_CODES.has(error.code)) credentials.clearAll();
 }
 
 /** Query and mutation caches that end the session on a rejected credential (also used by tests). */
@@ -45,15 +46,22 @@ export function createQueryClient(): QueryClient {
   });
 }
 
-/** Drops cached data whenever a credential changes, so no data outlives the key that fetched it. */
+/**
+ * Drops cached data whenever the signed-in identity changes (role or account), so no data outlives
+ * the session that fetched it. A refreshed access token for the same identity keeps the cache.
+ */
 function useClearCacheOnCredentialChange(client: QueryClient): void {
   const previous = useRef(credentials.get());
   useEffect(
     () =>
       credentials.subscribe(() => {
         const next = credentials.get();
-        if (previous.current.adminToken !== next.adminToken) client.removeQueries({ queryKey: ['admin'] });
-        if (previous.current.account?.apiKey !== next.account?.apiKey) client.removeQueries({ queryKey: ['account'] });
+        const wasOperator = previous.current.role === 'operator' && previous.current.accessToken !== null;
+        const isOperator = next.role === 'operator' && next.accessToken !== null;
+        if (wasOperator !== isOperator) client.removeQueries({ queryKey: ['admin'] });
+        const previousAccount = previous.current.accessToken ? previous.current.account?.accountId : undefined;
+        const nextAccount = next.accessToken ? next.account?.accountId : undefined;
+        if (previousAccount !== nextAccount) client.removeQueries({ queryKey: ['account'] });
         previous.current = next;
       }),
     [client],

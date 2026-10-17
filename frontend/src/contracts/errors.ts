@@ -6,9 +6,12 @@ export const ERROR_CODES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR', // 400
   API_KEY_MISSING: 'API_KEY_MISSING', // 401
   API_KEY_INVALID: 'API_KEY_INVALID', // 401
-  ADMIN_TOKEN_MISSING: 'ADMIN_TOKEN_MISSING', // 401
-  ADMIN_TOKEN_INVALID: 'ADMIN_TOKEN_INVALID', // 401
-  CREDENTIAL_INVALID: 'CREDENTIAL_INVALID', // 401 (login: neither the admin token nor a known API key)
+  TOKEN_MISSING: 'TOKEN_MISSING', // 401 (no Authorization: Bearer access token)
+  TOKEN_INVALID: 'TOKEN_INVALID', // 401 (bad signature, issuer, audience or format)
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED', // 401 (refresh it with POST /auth/refresh)
+  REFRESH_TOKEN_INVALID: 'REFRESH_TOKEN_INVALID', // 401 (missing, expired, revoked or reused)
+  CREDENTIAL_INVALID: 'CREDENTIAL_INVALID', // 401 (login: neither the operator token nor a known API key)
+  INSUFFICIENT_ROLE: 'INSUFFICIENT_ROLE', // 403 (valid token, wrong interface: operator vs account)
   PLAN_READ_ONLY: 'PLAN_READ_ONLY', // 403
   NOT_FOUND: 'NOT_FOUND', // 404 (unknown route)
   ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND', // 404

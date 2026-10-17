@@ -7,7 +7,7 @@
  *   npm run demo:populate
  *
  * Environment: API_URL (default http://localhost:3000/api/v1), ADMIN_API_TOKEN (default: the
- * local demo token). Run it once on a fresh database (docker compose down -v && docker compose up --build);
+ * local demo token; exchanged for an operator JWT at POST /auth/token). Run it once on a fresh database (docker compose down -v && docker compose up --build);
  * it stops without changes if the sample companies already exist.
  */
 import { randomUUID } from 'node:crypto';
@@ -21,10 +21,12 @@ const PLANS = {
   premium: '00000000-0000-4000-8000-000000000004',
 };
 
+let operatorAccessToken = null;
+
 async function call(method, path, { body, apiKey, admin = false } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers['x-api-key'] = apiKey;
-  if (admin) headers.authorization = `Bearer ${ADMIN_TOKEN}`;
+  if (admin) headers.authorization = `Bearer ${operatorAccessToken}`;
   const response = await fetch(`${API_URL}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`${method} ${path} -> ${response.status} ${payload.error?.code ?? ''} ${payload.error?.message ?? ''}`);
@@ -84,6 +86,8 @@ const SIGNUPS = [
 ];
 
 async function main() {
+  // Operator endpoints take a JWT: exchange the operator token for one (POST /auth/token).
+  operatorAccessToken = (await call('POST', '/auth/token', { body: { token: ADMIN_TOKEN } })).accessToken;
   const existing = await call('GET', `/admin/accounts?search=${encodeURIComponent(COMPANIES[0].name)}`, { admin: true });
   if (existing.totalItems > 0) {
     console.log('Sample data is already there; nothing to do. (Reset with: docker compose down -v && docker compose up --build)');

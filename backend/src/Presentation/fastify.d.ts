@@ -1,10 +1,11 @@
+import type { Role } from '../contracts';
 import type { AuthenticatedAccount } from '../Domain/Accounts/Account';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /** Set by the API-key preHandler for account-scoped routes. */
+    /** The account of an account-scoped request (from the API key or the account access token). */
     account?: AuthenticatedAccount;
-    /** Set by the admin-token preHandler for operator routes. */
-    isAdmin?: boolean;
+    /** Role of the verified caller. */
+    role?: Role;
   }
 }

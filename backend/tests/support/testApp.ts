@@ -11,6 +11,7 @@ import { TEST_DATABASE_URL } from './testDatabase';
 
 export const TEST_ADMIN_TOKEN = 'test-admin-token-0123456789';
 export const TEST_DEMO_API_KEY = 'umk_demo_test_key_for_integration_tests';
+export const TEST_JWT_SECRET = 'test-jwt-secret-for-integration-tests-0123456789';
 export { PREDEFINED_PLAN_IDS };
 
 /** A clock tests can move, e.g. across a UTC month boundary. Defaults to real time. */
@@ -47,6 +48,7 @@ export async function createTestContext(options: { aiProvider?: AIProvider; pool
     AI_RATE_LIMIT_PER_WINDOW: '1000',
     // Many tests send wrong credentials on purpose; security.test.ts checks the real limit.
     AUTH_FAILURE_LIMIT_PER_MINUTE: '100000',
+    JWT_SECRET: TEST_JWT_SECRET,
     ...options.env,
   });
   const pool = createPool(TEST_DATABASE_URL, options.poolSize ?? 20);
@@ -54,6 +56,9 @@ export async function createTestContext(options: { aiProvider?: AIProvider; pool
   const container = createContainer({ config, pool, clock, aiProvider: options.aiProvider });
   const app = await buildApp(container, { logger: false });
   await app.ready();
+  // Operator routes need an operator JWT: sign in once with the operator token (same flow as the UI).
+  const operator = await container.auth.issue.execute(TEST_ADMIN_TOKEN);
+  adminHeaders.authorization = `Bearer ${operator.response.accessToken}`;
   return {
     app,
     pool,
@@ -68,7 +73,9 @@ export async function createTestContext(options: { aiProvider?: AIProvider; pool
 
 // ---------------------------------------------------------------- request helpers
 
-export const adminHeaders = { authorization: `Bearer ${TEST_ADMIN_TOKEN}` };
+/** Operator request headers: a JWT access token, set by createTestContext (POST /auth/token flow). */
+export const adminHeaders: { authorization: string } = { authorization: '' };
+export const operatorToken = (): string => adminHeaders.authorization.replace(/^Bearer /, '');
 export const keyHeaders = (apiKey: string) => ({ 'x-api-key': apiKey });
 
 export function json<T>(response: LightMyRequestResponse): T {

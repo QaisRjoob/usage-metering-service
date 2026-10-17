@@ -1,15 +1,15 @@
 import { ERROR_CODES } from '@/models/api-response';
 import { apiConfig } from './apiConfig';
-import { ApiError, isApiErrorBody } from './apiErrors';
+import { CSRF_HEADER, CSRF_HEADER_VALUE, type TokenResponse } from '@/contracts';
+import { ApiError, isApiError, isApiErrorBody } from './apiErrors';
 import { credentials } from './credentials';
 
 /**
- * Which credential a request carries:
- * - 'admin'   Authorization: Bearer <admin token>   (operator endpoints under /admin)
- * - 'account' X-API-Key: <connected account key>    (account-scoped endpoints)
- * - { apiKey } / { adminToken } an explicit credential, used to verify it before it is stored
+ * Which session a request needs. Both send the JWT access token (Authorization: Bearer); the
+ * server checks its role: 'admin' = operator endpoints under /admin, 'account' = account-scoped
+ * endpoints. 'none' = public endpoints (sign-in, refresh, sign-up).
  */
-export type AuthMode = 'none' | 'admin' | 'account' | { apiKey: string } | { adminToken: string };
+export type AuthMode = 'none' | 'admin' | 'account';
 
 export type QueryValue = string | number | boolean | null | undefined;
 
@@ -20,6 +20,8 @@ export interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** Extra headers (e.g. the CSRF header of the refresh and logout routes). */
+  headers?: Record<string, string>;
 }
 
 export function buildUrl(path: string, query?: Record<string, QueryValue>): string {
@@ -34,43 +36,66 @@ export function buildUrl(path: string, query?: Record<string, QueryValue>): stri
   return url.toString();
 }
 
-function authHeaders(auth: AuthMode): Record<string, string> {
-  if (auth === 'none') return {};
-  if (auth === 'admin' || (typeof auth === 'object' && 'adminToken' in auth)) {
-    const token = auth === 'admin' ? credentials.get().adminToken : auth.adminToken;
-    if (!token) {
-      throw new ApiError({
-        kind: 'http',
-        status: 401,
-        code: ERROR_CODES.ADMIN_TOKEN_MISSING,
-        message: 'Enter the operator admin token to use this page.',
-      });
-    }
-    return { Authorization: `Bearer ${token}` };
-  }
-  const apiKey = auth === 'account' ? credentials.get().account?.apiKey : auth.apiKey;
-  if (!apiKey) {
-    throw new ApiError({
-      kind: 'http',
-      status: 401,
-      code: ERROR_CODES.API_KEY_MISSING,
-      message: 'Connect an account API key to use this page.',
+/** Refresh a little before expiry so a request never leaves with a token about to lapse. */
+const REFRESH_MARGIN_MS = 30_000;
+let refreshInFlight: Promise<string> | null = null;
+
+/**
+ * POST /auth/refresh with the HttpOnly refresh cookie. Concurrent callers share one request. On
+ * failure the session ends (the route guard then shows the login page).
+ */
+export function refreshAccessToken(): Promise<string> {
+  refreshInFlight ??= send<TokenResponse>('/auth/refresh', { method: 'POST', auth: 'none', headers: { [CSRF_HEADER]: CSRF_HEADER_VALUE } }, {})
+    .then((session) => {
+      credentials.setSession(session);
+      return session.accessToken;
+    })
+    .catch((error: unknown) => {
+      credentials.clearAll();
+      throw error;
+    })
+    .finally(() => {
+      refreshInFlight = null;
     });
+  return refreshInFlight;
+}
+
+async function currentAccessToken(): Promise<string> {
+  const { accessToken, expiresAt } = credentials.get();
+  if (!accessToken) {
+    throw new ApiError({ kind: 'http', status: 401, code: ERROR_CODES.TOKEN_MISSING, message: 'Sign in to use this page.' });
   }
-  return { [apiConfig.apiKeyHeader]: apiKey };
+  if (expiresAt !== null && expiresAt - REFRESH_MARGIN_MS <= Date.now()) return refreshAccessToken();
+  return accessToken;
 }
 
 function newCorrelationId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
 }
 
-/** Performs a JSON request and maps every failure mode to an ApiError. */
+/**
+ * Performs a JSON request and maps every failure mode to an ApiError. Signed-in requests carry the
+ * access token; one that comes back TOKEN_EXPIRED is refreshed and retried once.
+ */
 export async function apiRequest<T>(path: string, options: RequestOptions): Promise<T> {
+  if (options.auth === 'none') return send<T>(path, options, {});
+  const token = await currentAccessToken();
+  try {
+    return await send<T>(path, options, { Authorization: `Bearer ${token}` });
+  } catch (error) {
+    if (!isApiError(error) || error.status !== 401 || error.code !== ERROR_CODES.TOKEN_EXPIRED) throw error;
+    const fresh = await refreshAccessToken();
+    return send<T>(path, options, { Authorization: `Bearer ${fresh}` });
+  }
+}
+
+async function send<T>(path: string, options: RequestOptions, auth: Record<string, string>): Promise<T> {
   const correlationId = newCorrelationId();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Request-Id': correlationId,
-    ...authHeaders(options.auth),
+    ...options.headers,
+    ...auth,
   };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -88,6 +113,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions): Prom
     response = await fetch(buildUrl(path, options.query), {
       method: options.method ?? 'GET',
       headers,
+      // The refresh cookie (HttpOnly, path /api/v1/auth) rides along; it is never readable here.
+      credentials: 'include',
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: controller.signal,
     });

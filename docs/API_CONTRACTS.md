@@ -17,9 +17,12 @@ Months are UTC calendar months written `YYYY-MM`.
 
 | Scope | Header | Used by |
 |---|---|---|
-| Account | `X-API-Key: <account key>` | everything under `/account`, `/users`, `/plans`, `/quotas`, `/usage`, and `/ai/advisor` (account answers) |
-| Operator | `Authorization: Bearer <ADMIN_API_TOKEN>` | everything under `/admin`, and `/ai/advisor` (cross-account answers) |
-| None | — | `/health`, `/ready` |
+| Account | `Authorization: Bearer <account access token>` (JWT from `/auth/token`), or `X-API-Key: <account key>` for server-to-server clients | everything under `/account`, `/users`, `/plans`, `/quotas`, `/usage`, and `/ai/advisor` (account answers) |
+| Operator | `Authorization: Bearer <operator access token>` (JWT from `/auth/token` with the operator token) | everything under `/admin`, and `/ai/advisor` (cross-account answers) |
+| None | — | `/health`, `/ready`, `/auth/*`, `/signup-requests*` |
+
+- A valid token of the other role answers `403 INSUFFICIENT_ROLE`; a missing token on `/admin`
+  `401 TOKEN_MISSING`, a bad one `401 TOKEN_INVALID`, an expired one `401 TOKEN_EXPIRED`.
 
 - The API key identifies the account. The API never accepts an account id as a replacement for the key.
 - Missing key → `401 API_KEY_MISSING`. Unknown key → `401 API_KEY_INVALID`.
@@ -37,8 +40,8 @@ Every non-2xx response has this body:
 | Status | Codes |
 |---|---|
 | 400 | `VALIDATION_ERROR` (`details` = `[{ path, message }]`) |
-| 401 | `API_KEY_MISSING`, `API_KEY_INVALID`, `ADMIN_TOKEN_MISSING`, `ADMIN_TOKEN_INVALID`, `CREDENTIAL_INVALID` (login) |
-| 403 | `PLAN_READ_ONLY` (predefined plans cannot be edited) |
+| 401 | `API_KEY_MISSING`, `API_KEY_INVALID`, `TOKEN_MISSING`, `TOKEN_INVALID`, `TOKEN_EXPIRED`, `REFRESH_TOKEN_INVALID`, `CREDENTIAL_INVALID` (sign-in) |
+| 403 | `PLAN_READ_ONLY` (predefined plans cannot be edited), `INSUFFICIENT_ROLE` |
 | 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `USER_NOT_FOUND`, `PLAN_NOT_FOUND`, `USAGE_RECORD_NOT_FOUND`, `SIGNUP_REQUEST_NOT_FOUND` (also a wrong claim code) |
 | 409 | `USER_ALREADY_EXISTS`, `PLAN_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `SIGNUP_ALREADY_PENDING`, `SIGNUP_ALREADY_DECIDED`, `SIGNUP_NOT_APPROVED`, `SIGNUP_ALREADY_CLAIMED` |
 | 422 | `PLAN_SCOPE_MISMATCH` (user plan on an account or vice versa) |
@@ -100,13 +103,16 @@ Rule evaluation order (first failure is `rejection`; all failures are in `violat
 | GET | `/health` | liveness |
 | GET | `/ready` | readiness (checks PostgreSQL) |
 
-### Login helper (no credential header)
+### Authentication (no credential header)
 | Method | Path | Request | Response |
 |---|---|---|---|
-| POST | `/auth/identify` | `{ token }` (any pasted token, trimmed, 1–512 chars) | `{ role: "operator" }` for the admin token, `{ role: "account", account: { id, name, apiKeyPrefix } }` for an API key; anything else → `401 CREDENTIAL_INVALID`. Rate-limited per IP (LOGIN_RATE_LIMIT_PER_MINUTE, default 20). |
+| POST | `/auth/token` | `{ token }` (the operator token or an account API key, trimmed, 1–512 chars) | `TokenResponse { accessToken, tokenType: "Bearer", expiresIn, role, account? }` + `Set-Cookie: umk_refresh` (HttpOnly, SameSite=Strict, path /api/v1/auth); anything else → `401 CREDENTIAL_INVALID`. Rate-limited per IP (LOGIN_RATE_LIMIT_PER_MINUTE, default 20). |
+| POST | `/auth/refresh` | cookie `umk_refresh`, header `X-Requested-With: umk-web` | `TokenResponse` + a new cookie (rotation); missing/expired/revoked/reused → `401 REFRESH_TOKEN_INVALID` (a reused token revokes the whole session) |
+| POST | `/auth/logout` | cookie `umk_refresh`, header `X-Requested-With: umk-web` | `204`; the session is revoked and the cookie cleared |
 
-The login page uses it to open the right interface from one field. It does not create a session or
-cookie: the client then sends the token as `Authorization: Bearer` (operator) or `X-API-Key` (account).
+The login page sends whatever was pasted to `/auth/token`; the role in the answer decides which
+interface opens. The access token is a JWT (HS256; claims `iss`, `aud`, `sub`, `role`, `iat`,
+`exp`, `jti`) and is kept in memory by the web app; the refresh token never leaves its cookie.
 
 ### Self-service sign-up (no credential header)
 | Method | Path | Request | Response |

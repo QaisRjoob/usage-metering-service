@@ -68,11 +68,11 @@ predefined plans and the demo data (all idempotent) → the web app starts once 
 
 | Credential | Value | Used for |
 |---|---|---|
-| Operator admin token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`) | the **operator console** (`/admin`) |
+| Operator token | `local-admin-token-change-me` (override with `ADMIN_API_TOKEN`); exchanged for a JWT at sign-in | the **operator console** (`/admin`) |
 | Demo account API key | `umk_demo_local_only_do_not_use_in_production` | the **account portal** (`/app`) of "شركة الوثائق التجريبية" |
 
 The web app opens on a **login page with one field**: paste any token and press *Sign in*. The server
-identifies it (`POST /api/v1/auth/identify`): the operator token opens the operator console, an account
+identifies it (`POST /api/v1/auth/token`, which returns a JWT): the operator token opens the operator console, an account
 API key opens that account's portal — nobody picks a role by hand. Each role
 gets its own interface (own layout, menu and URL space); the other role's pages are unreachable:
 
@@ -167,20 +167,34 @@ Both plans apply to every request. The account's usage is the **sum of accepted 
 users**. Giving a user a larger plan does **not** increase the account's shared allowance. Users who
 share a plan definition keep separate totals.
 
-## 4. API keys and the operator token
+## 4. Authentication: JWT, API keys and the operator token
 
-- **Account API key** — sent as `X-API-Key: <key>` on every account-scoped request.
-  - Issued once by `POST /api/v1/admin/accounts`; the response contains the raw key, which is never
-    shown again. Format `umk_live_` + 32 random bytes (base64url).
-  - Only a SHA-256 hash and a non-secret 13-character prefix are stored.
-  - The key alone identifies the account; the API never accepts an account id instead.
-  - Missing key → `401 API_KEY_MISSING`; unknown/malformed key → `401 API_KEY_INVALID`.
-  - Resources of another account (users, plans, records) answer **404**, never 403.
-- **Operator token** — `Authorization: Bearer <ADMIN_API_TOKEN>` for `/api/v1/admin/*` (create and
-  list accounts, cross-account history, dashboard analytics). Compared in constant time. This is a
-  **local/demo mechanism**: in production it would sit behind real operator authentication (out of
-  scope). The operator token does not open account-scoped endpoints: registering users or changing
-  plans always uses the account's own key, in the account portal. The operator's account pages are read-only.
+**Signing in issues a JWT.** `POST /api/v1/auth/token` takes a credential (an account API key or the
+operator token) and returns a short-lived **JWT access token**; the server also sets a **refresh
+token** as an `HttpOnly` cookie. Every other request sends `Authorization: Bearer <access token>`.
+
+| Token | What it is | Lifetime | Where it lives |
+|---|---|---|---|
+| Access token | JWT, HS256, claims `iss`, `aud`, `sub` (account id or `operator`), `role`, `iat`, `exp`, `jti` | 15 min (`ACCESS_TOKEN_TTL_SECONDS`) | browser memory only |
+| Refresh token | opaque random value (`umr_…`), stored only as a SHA-256 hash | 7 days (`REFRESH_TOKEN_TTL_DAYS`) | `HttpOnly`, `SameSite=Strict` cookie, path `/api/v1/auth` |
+
+- `POST /auth/refresh` rotates: the refresh token is used up and a new pair is issued. Presenting
+  an already-used refresh token again (a copied/stolen one) **revokes the whole session**.
+  `POST /auth/logout` revokes the session. Both need the header `X-Requested-With: umk-web` (CSRF guard).
+- The verifier pins `HS256`, the issuer and the audience, so `alg: none` or tokens signed with
+  another key are rejected (`401 TOKEN_INVALID`); an expired token answers `401 TOKEN_EXPIRED`
+  and the web app refreshes it silently.
+- **Roles decide the interface**: operator endpoints (`/admin/*`) accept only an operator token;
+  account endpoints only an account token (the wrong role answers `403 INSUFFICIENT_ROLE`).
+
+**Account API key** — `umk_live_` + 32 random bytes, issued once by `POST /admin/accounts` (or
+collected once after a sign-up approval). Only a SHA-256 hash and a 13-character display prefix are
+stored. Besides signing in, **server-to-server clients may send it directly** as `X-API-Key` on
+account endpoints, as the brief requires (the CLI client does). The key alone identifies the
+account; resources of another account answer **404**, never 403.
+
+**Operator token** (`ADMIN_API_TOKEN`) — the operator's credential, accepted **only** at
+`POST /auth/token` and exchanged there for an operator JWT; `/admin/*` itself never accepts it.
 
 ## 5. API reference and curl walkthrough
 
@@ -233,10 +247,13 @@ Sorting by `lastActivity` puts rows without any request last in both directions.
 
 ```bash
 API=http://localhost:3000/api/v1
-ADMIN=local-admin-token-change-me
+
+# 0. The operator signs in: the operator token is exchanged for a JWT access token (15 minutes).
+curl -s -X POST $API/auth/token -H 'Content-Type: application/json' -d '{"token":"local-admin-token-change-me"}'
+JWT=eyJ...   # paste accessToken
 
 # 1. Operator creates an account (starts on Starter). Copy the apiKey from the response - it is shown once.
-curl -s -X POST $API/admin/accounts -H "Authorization: Bearer $ADMIN" \
+curl -s -X POST $API/admin/accounts -H "Authorization: Bearer $JWT" \
   -H 'Content-Type: application/json' -d '{"name":"Acme Docs"}'
 KEY=umk_live_...   # paste the key
 
