@@ -1,10 +1,18 @@
-# Rendered at container start by the nginx image: ${API_ORIGIN} comes from the environment.
+# Rendered at container start by the nginx image: ${PORT}, ${API_UPSTREAM}, ${API_ORIGIN} and the
+# REAL_IP_FROM values come from the environment (defaults in the Dockerfile suit docker compose).
 server {
-  listen 80;
+  listen ${PORT};
+  listen [::]:${PORT};
   server_name _;
   root /usr/share/nginx/html;
   index index.html;
   server_tokens off;
+
+  # Behind a hosting edge proxy (e.g. Railway) the client address arrives in X-Forwarded-For. Only
+  # these sources are believed; the defaults (loopback) mean "no edge proxy", as with docker compose.
+  set_real_ip_from ${REAL_IP_FROM};
+  set_real_ip_from ${REAL_IP_FROM_V6};
+  real_ip_header X-Forwarded-For;
 
   # Security headers. They live at server level and no location below uses add_header, because
   # nginx drops inherited add_header directives in any block that declares its own.
@@ -18,7 +26,7 @@ server {
   # The API is served from the same origin as the app, so the browser never makes a cross-origin
   # request (no CORS, and localhost, 127.0.0.1 and IPv6 all behave alike).
   location /api/ {
-    proxy_pass http://api:3000;
+    proxy_pass ${API_UPSTREAM};
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     # Overwrite, never append: the API trusts this header only from nginx, so clients cannot fake it.

@@ -46,11 +46,12 @@ explains rejections, and stays correct under retries and concurrent traffic.
 15. [Testing](#-testing)
 16. [Performance](#-performance)
 17. [Local development](#-local-development)
-18. [Product assumptions](#-product-assumptions)
-19. [Design decisions and trade-offs](#-design-decisions-and-trade-offs)
-20. [Known limitations](#-known-limitations)
-21. [UML diagrams](#-uml-diagrams)
-22. [Documentation](#-documentation)
+18. [Deploy to Railway](#-deploy-to-railway)
+19. [Product assumptions](#-product-assumptions)
+20. [Design decisions and trade-offs](#-design-decisions-and-trade-offs)
+21. [Known limitations](#-known-limitations)
+22. [UML diagrams](#-uml-diagrams)
+23. [Documentation](#-documentation)
 
 ---
 
@@ -598,6 +599,45 @@ npm run dev:api-mode          # http://localhost:5174 against the real API on :3
 `npm run db:migrate` and `npm run db:seed` (in `backend/`) run the startup steps by hand. When the API
 contract changes, update `backend/src/contracts` and copy the change to `frontend/src/contracts`;
 `diff -r backend/src/contracts frontend/src/contracts` must print nothing.
+
+---
+
+## 🚢 Deploy to Railway
+
+The repository root holds two apps, so Railway must not build the root (that fails with
+"Railpack failed to prepare the build"). Create **three services** in one Railway project:
+
+| Service | How to create it | Settings |
+|---|---|---|
+| **Postgres** | *New → Database → PostgreSQL* | nothing to change |
+| **api** | *New → GitHub repo* (this repository), then rename it to `api` | *Settings → Root Directory* = `/backend` (the Dockerfile there is used) |
+| **web** | *New → GitHub repo* again, rename it to `web` | *Settings → Root Directory* = `/frontend`; *Networking → Generate Domain* |
+
+**api variables**
+
+| Variable | Value |
+|---|---|
+| `NODE_ENV` | `production` |
+| `HOST` / `PORT` | `::` / `3000` (listen on Railway's private IPv6 network) |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+| `ADMIN_API_TOKEN` | a long random value (the operator sign-in) |
+| `JWT_SECRET` | a long random value, at least 32 characters |
+| `COOKIE_SECURE` | `true` (Railway serves HTTPS) |
+| `TRUST_PROXY_HOPS` | `1` (believe the client address sent by the web service) |
+| `SEED_DEMO_DATA` | `true` for a public demo with the demo company, `false` otherwise |
+| `AI_PROVIDER`, `OPENAI_*` | optional, see [AI Usage Advisor](#-ai-usage-advisor) |
+
+**web variables**
+
+| Variable | Value |
+|---|---|
+| `API_UPSTREAM` | `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:3000` |
+| `REAL_IP_FROM` / `REAL_IP_FROM_V6` | `0.0.0.0/0` / `::/0` (believe Railway's edge proxy) |
+| `VITE_DEMO_API_KEY` | `umk_demo_local_only_do_not_use_in_production` only when the demo data is seeded |
+
+Only the web service gets a public domain; the API is reached through it at `/api`, so no CORS
+setup is needed. Railway sets `PORT` for the web service and nginx listens on it. Generate the
+secrets with `openssl rand -base64 48`.
 
 ---
 

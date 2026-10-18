@@ -18,6 +18,6 @@ COPY --from=build /app/dist ./dist
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=10 \
-  CMD wget -qO- http://127.0.0.1:3000/api/v1/ready >/dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-3000}/api/v1/ready" >/dev/null || exit 1
 # Migrations and the idempotent seed run inside server startup.
 CMD ["node", "dist/server.js"]
