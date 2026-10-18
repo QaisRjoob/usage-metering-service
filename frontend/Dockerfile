@@ -9,9 +9,12 @@ COPY . .
 # Baked in at build time. Default: same origin; nginx forwards /api/* to the API container.
 ARG VITE_API_BASE_URL=/api/v1
 ARG VITE_DEMO_API_KEY=
+# Shown as a test account on the login page when set (public demos only).
+ARG VITE_DEMO_OPERATOR_TOKEN=
 ENV VITE_DATA_SOURCE=api \
     VITE_API_BASE_URL=${VITE_API_BASE_URL} \
-    VITE_DEMO_API_KEY=${VITE_DEMO_API_KEY}
+    VITE_DEMO_API_KEY=${VITE_DEMO_API_KEY} \
+    VITE_DEMO_OPERATOR_TOKEN=${VITE_DEMO_OPERATOR_TOKEN}
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime

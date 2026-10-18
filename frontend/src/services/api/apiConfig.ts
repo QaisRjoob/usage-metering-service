@@ -21,6 +21,8 @@ export const apiConfig = {
   timeoutMs: readTimeout(),
   /** Seeded demo API key, pre-filled in the Client Demo. Local demo use only. */
   demoApiKey: import.meta.env.VITE_DEMO_API_KEY?.trim() || null,
+  /** Operator token shown as a test account on the login page. Public demos only; unset = hidden. */
+  demoOperatorToken: import.meta.env.VITE_DEMO_OPERATOR_TOKEN?.trim() || null,
   apiKeyHeader: 'X-API-Key',
 } as const;
 

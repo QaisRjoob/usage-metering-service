@@ -147,7 +147,10 @@ predefined plans and demo data (all idempotent), then the web app starts once th
 | Demo account API key | `umk_demo_local_only_do_not_use_in_production` | Company portal `/app` of "شركة الوثائق التجريبية" |
 
 The login page has a single field: paste a credential and the server identifies it, so nobody picks a
-role by hand. To start again from a clean state:
+role by hand. A **Test accounts** box under the form signs in as the demo company or the operator in
+one click (it appears when `VITE_DEMO_API_KEY` / `VITE_DEMO_OPERATOR_TOKEN` are set at build time).
+
+To start again from a clean state:
 
 ```bash
 docker compose down -v
@@ -633,7 +636,8 @@ The repository root holds two apps, so Railway must not build the root (that fai
 |---|---|
 | `API_UPSTREAM` | `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:3000` |
 | `REAL_IP_FROM` / `REAL_IP_FROM_V6` | `0.0.0.0/0` / `::/0` (believe Railway's edge proxy) |
-| `VITE_DEMO_API_KEY` | `umk_demo_local_only_do_not_use_in_production` only when the demo data is seeded |
+| `VITE_DEMO_API_KEY` | `umk_demo_local_only_do_not_use_in_production` only when the demo data is seeded (shows the demo company test account) |
+| `VITE_DEMO_OPERATOR_TOKEN` | optional: the api's `ADMIN_API_TOKEN` value, to show an operator test account. Anyone who opens the site can then act as operator, so use it only for a demo |
 
 Only the web service gets a public domain; the API is reached through it at `/api`, so no CORS
 setup is needed. Railway sets `PORT` for the web service and nginx listens on it. Generate the

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
-import { ArrowRight, Building2, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Building2, Check, Copy, Eye, EyeOff, FlaskConical, KeyRound, LogIn, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { useCredentialActions } from '@/hooks/useCredentialActions';
 import { useCredentials } from '@/hooks/useCredentials';
 import { homeFor, routePaths } from '@/routing/routePaths';
@@ -20,8 +20,18 @@ function safeNext(next: string | null, role: SessionRole): string {
   return next && next.startsWith(prefix) ? next : homeFor(role);
 }
 
+/** A ready-made credential shown on the login page so visitors can try the app. */
+interface TestAccount {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  name?: string;
+  description: string;
+  token: string;
+}
+
 /**
- * One field for everyone. The server identifies the token (POST /auth/identify): the operator's
+ * One field for everyone. The server identifies the token (POST /auth/token): the operator's
  * admin token opens the operator console, an account API key opens that company's portal.
  */
 export default function LoginView() {
@@ -30,6 +40,7 @@ export default function LoginView() {
   const [params] = useSearchParams();
   const [token, setToken] = useState('');
   const [reveal, setReveal] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const { signIn } = useCredentialActions();
   const current = roleOf(session);
 
@@ -39,11 +50,46 @@ export default function LoginView() {
   if (current && signIn.isIdle) return <Navigate to={homeFor(current)} replace />;
 
   const demoKey = apiConfig.demoApiKey ?? (isMockMode ? DEMO_API_KEY : null);
+  const demoOperatorToken = apiConfig.demoOperatorToken ?? (isMockMode ? MOCK_ADMIN_TOKEN : null);
+  const testAccounts: TestAccount[] = [];
+  if (demoKey) {
+    testAccounts.push({
+      id: 'company',
+      icon: Building2,
+      title: 'Demo company',
+      name: 'شركة الوثائق التجريبية',
+      description: 'Company portal: users, plans, quotas, history and the Client Demo.',
+      token: demoKey,
+    });
+  }
+  if (demoOperatorToken) {
+    testAccounts.push({
+      id: 'operator',
+      icon: ShieldCheck,
+      title: 'Operator',
+      description: 'Operator console: every company, access requests and analytics.',
+      token: demoOperatorToken,
+    });
+  }
+
+  const signInWith = (value: string) =>
+    signIn.mutate(value, { onSuccess: (role) => navigate(safeNext(params.get('next'), role), { replace: true }) });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!token.trim()) return;
-    signIn.mutate(token, { onSuccess: (role) => navigate(safeNext(params.get('next'), role), { replace: true }) });
+    signInWith(token);
+  };
+
+  const copy = async (account: TestAccount) => {
+    try {
+      await navigator.clipboard.writeText(account.token);
+      setCopied(account.id);
+      window.setTimeout(() => setCopied((current) => (current === account.id ? null : current)), 1500);
+    } catch {
+      // Clipboard blocked (e.g. insecure context): fill the field instead so it can still be used.
+      setToken(account.token);
+    }
   };
 
   return (
@@ -118,20 +164,47 @@ export default function LoginView() {
           </div>
         </div>
 
-        {(demoKey || isMockMode) && (
-          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-            <span className="text-xs text-slate-500">Local demo:</span>
-            {demoKey && (
-              <Button variant="outline" size="sm" onClick={() => setToken(demoKey)}>
-                Use demo company key
-              </Button>
-            )}
-            {isMockMode && (
-              <Button variant="outline" size="sm" onClick={() => setToken(MOCK_ADMIN_TOKEN)}>
-                Use mock operator token
-              </Button>
-            )}
-          </div>
+        {testAccounts.length > 0 && (
+          <section aria-labelledby="test-accounts-title" className="mt-6 border-t border-slate-100 pt-5">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="size-4 text-brand-600" aria-hidden="true" />
+              <h2 id="test-accounts-title" className="text-sm font-semibold text-slate-800">
+                Test accounts
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Want to try the app? Sign in with sample data in one click.</p>
+            <ul className="mt-3 space-y-2">
+              {testAccounts.map((account) => (
+                <li key={account.id} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-start gap-3">
+                    <account.icon className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-800">{account.title}</p>
+                      {account.name && (
+                        <p dir="rtl" className="text-left text-xs font-medium text-slate-600">
+                          {account.name}
+                        </p>
+                      )}
+                      <p className="mt-0.5 text-xs text-slate-500">{account.description}</p>
+                      <code className="mt-2 block truncate rounded bg-slate-50 px-2 py-1 font-mono text-[11px] text-slate-600" title={account.token}>
+                        {account.token}
+                      </code>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" className="flex-1" disabled={signIn.isPending} onClick={() => signInWith(account.token)}>
+                      <LogIn className="size-3.5" aria-hidden="true" /> Sign in as {account.title.toLowerCase()}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => void copy(account)} aria-label={`Copy the ${account.title.toLowerCase()} credential`}>
+                      {copied === account.id ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+                      {copied === account.id ? 'Copied' : 'Copy'}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[11px] text-slate-400">Shared sample data: anyone can see and change it.</p>
+          </section>
         )}
       </Card>
       <p className="mt-4 text-center text-xs text-slate-400">Your key stays in this browser tab only and is cleared when you sign out or close it.</p>

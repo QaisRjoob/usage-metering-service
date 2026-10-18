@@ -79,6 +79,8 @@ services:
       args:
         VITE_API_BASE_URL: /api/v1
         VITE_DEMO_API_KEY: umk_demo_local_only_do_not_use_in_production
+        # Operator test account on the login page; must equal ADMIN_API_TOKEN. Set it empty to hide it.
+        VITE_DEMO_OPERATOR_TOKEN: ${DEMO_OPERATOR_TOKEN-local-admin-token-change-me}
     restart: unless-stopped
     depends_on:
       api:
