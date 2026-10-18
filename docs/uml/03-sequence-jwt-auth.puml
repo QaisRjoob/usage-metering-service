@@ -1,54 +1,57 @@
 @startuml 03-sequence-jwt-auth
-title Sequence - JWT sign-in, silent refresh, reuse detection, sign-out
+title JWT sign-in and refresh
+hide footbox
 skinparam shadowing false
-autonumber
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam sequenceMessageAlign center
+skinparam roundCorner 12
+skinparam ArrowColor #4F46E5
+skinparam ArrowThickness 1.3
+skinparam SequenceLifeLineBorderColor #C7D2FE
+skinparam ParticipantBackgroundColor #EEF2FF
+skinparam ParticipantBorderColor #4F46E5
+skinparam ParticipantFontStyle bold
+skinparam ActorBackgroundColor #EEF2FF
+skinparam ActorBorderColor #4F46E5
+skinparam DatabaseBackgroundColor #EEF2FF
+skinparam DatabaseBorderColor #4F46E5
+skinparam NoteBackgroundColor #FFFBEB
+skinparam NoteBorderColor #F59E0B
+skinparam SequenceGroupBorderColor #94A3B8
+skinparam SequenceGroupHeaderFontColor #334155
+skinparam SequenceDividerBackgroundColor #E0E7FF
+skinparam SequenceDividerBorderColor #4F46E5
+skinparam TitleFontSize 18
 
 actor User
-participant "Web app\n(React, apiClient)" as Web
-participant "nginx\n(/api proxy)" as Nginx
-participant "API\n/auth routes" as Auth
-participant "AccessTokenService\n(jose, HS256)" as JWT
-database "PostgreSQL\nrefresh_tokens" as DB
+participant "Web app" as Web
+participant "API" as API
+database "Database" as DB
 
 == Sign in ==
-User -> Web : paste API key or operator token
-Web -> Nginx : POST /api/v1/auth/token { token }
-Nginx -> Auth : forward
-Auth -> Auth : identify credential\n(operator token | API key hash)
-Auth -> JWT : issue(role, subject)
-JWT --> Auth : access token (15 min)
-Auth -> DB : INSERT refresh token hash\n(new family)
-Auth --> Web : { accessToken, role, account }\nSet-Cookie: umk_refresh\n(HttpOnly, SameSite=Strict)
-Web -> Web : keep access token in memory only
+User -> Web : enter API key or operator token
+Web -> API : POST /auth/token
+API -> DB : save refresh token (hashed)
+API --> Web : access token (15 min)\n+ refresh cookie (7 days)
 
-== Normal request ==
-Web -> Auth : GET /admin/accounts\nAuthorization: Bearer <JWT>
-Auth -> JWT : verify (alg, iss, aud, exp)
-Auth --> Web : 200 data
+== Use the app ==
+Web -> API : request + Bearer access token
+API --> Web : data
 
-== Token about to expire / expired ==
-alt < 30 s left (before the request)
-  Web -> Auth : POST /auth/refresh (cookie + X-Requested-With)
-else server answers 401 TOKEN_EXPIRED
-  Web -> Auth : POST /auth/refresh, then retry once
-end
-Auth -> DB : find token by hash FOR UPDATE
-alt valid and unused
-  Auth -> DB : mark used, INSERT next token\n(same family)
-  Auth --> Web : new access token + new cookie
-else already used (copied token replayed)
-  Auth -> DB : revoke the whole family
-  Auth --> Web : 401 REFRESH_TOKEN_INVALID
-  Web -> Web : end session -> login page
-end
-
-== Page reload ==
-Web -> Auth : POST /auth/refresh (cookie)
-Auth --> Web : new access token (session restored)
+== Refresh (automatic) ==
+Web -> API : POST /auth/refresh (cookie)
+API -> DB : use old token, save new one
+API --> Web : new access token + new cookie
 
 == Sign out ==
 User -> Web : Sign out
-Web -> Auth : POST /auth/logout (cookie + X-Requested-With)
-Auth -> DB : revoke family
-Auth --> Web : 204, cookie cleared
+Web -> API : POST /auth/logout
+API -> DB : revoke the session
+API --> Web : cookie cleared
+
+note over API, DB
+  A refresh token works once. If an old one is used
+  again, the whole session is revoked.
+end note
 @enduml

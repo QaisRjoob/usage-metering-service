@@ -1,50 +1,51 @@
 @startuml 02-sequence-consume
-title Sequence - POST /usage/consume (one transaction)
+title Consume units
+hide footbox
 skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
 skinparam sequenceMessageAlign center
-autonumber
+skinparam roundCorner 12
+skinparam ArrowColor #4F46E5
+skinparam ArrowThickness 1.3
+skinparam SequenceLifeLineBorderColor #C7D2FE
+skinparam ParticipantBackgroundColor #EEF2FF
+skinparam ParticipantBorderColor #4F46E5
+skinparam ParticipantFontStyle bold
+skinparam ActorBackgroundColor #EEF2FF
+skinparam ActorBorderColor #4F46E5
+skinparam DatabaseBackgroundColor #EEF2FF
+skinparam DatabaseBorderColor #4F46E5
+skinparam NoteBackgroundColor #FFFBEB
+skinparam NoteBorderColor #F59E0B
+skinparam SequenceGroupBorderColor #94A3B8
+skinparam SequenceGroupHeaderFontColor #334155
+skinparam SequenceDividerBackgroundColor #E0E7FF
+skinparam SequenceDividerBorderColor #4F46E5
+skinparam TitleFontSize 18
 
-participant "Client application" as Client
-participant "Fastify route\n(requireAccount)" as Route
-participant "ConsumeUnitsCommand" as Cmd
-participant "TransactionManager" as Tx
-database "PostgreSQL" as DB
-participant "QuotaPolicy\n(evaluateRequest)" as Policy
+participant "Client app" as Client
+participant "API" as API
+database "Database" as DB
 
-Client -> Route : POST /usage/consume\nX-API-Key or Bearer JWT\n{ userId, units, requestId }
-Route -> Route : authenticate (key hash / JWT)\n-> accountId
-Route -> Route : validate body (zod)
-Route -> Cmd : execute(request, { accountId })
-Cmd -> Tx : run(work)
-Tx -> DB : BEGIN
+Client -> API : POST /usage/consume\n{ userId, units, requestId }
+API -> DB : seen this requestId before?
 
-Cmd -> DB : pg_advisory_xact_lock(account, requestId)
-note right: concurrent retries of the\nsame request wait here
-Cmd -> DB : find record by (account, requestId)
-
-alt request already processed
-  alt same userId + units
-    Cmd -> DB : replay_count + 1
-    Cmd --> Route : stored decision\n(idempotentReplay: true)
-  else different payload
-    Cmd --> Route : 409 IDEMPOTENCY_KEY_REUSED
+alt yes (a retry)
+  DB --> API : stored decision
+  API --> Client : same decision again\n(nothing consumed twice)
+else no (new request)
+  API -> DB : lock account + user counters
+  API -> API : check the rules\n(user plan and account plan)
+  opt all rules pass
+    API -> DB : add units to both counters
   end
-else new request
-  Cmd -> DB : find user (account, externalUserId)
-  Cmd -> DB : SELECT account counter FOR UPDATE
-  Cmd -> DB : SELECT user counter FOR UPDATE
-  note right: fixed lock order:\naccount, then user\n(no deadlocks)
-  Cmd -> DB : current plan versions\n(read after the locks)
-  Cmd -> Policy : evaluate(units, account, user)
-  Policy --> Cmd : accepted | rejection(rule, level)\n+ all violations
-  opt accepted
-    Cmd -> DB : add units to both counters
-  end
-  Cmd -> DB : INSERT usage record\n(decision + plan versions)
-  Cmd --> Route : ConsumeDecision
+  API -> DB : save the decision
+  API --> Client : accepted or rejected\n+ remaining units
 end
 
-Tx -> DB : COMMIT
-note over Tx, DB : deadlock / serialization failure\n-> roll back and retry (bounded)
-Route --> Client : 200 { accepted, rejection, violations,\naccount & user snapshots }
+note over API, DB
+  Everything runs in one transaction,
+  so parallel requests can never go over a limit.
+end note
 @enduml

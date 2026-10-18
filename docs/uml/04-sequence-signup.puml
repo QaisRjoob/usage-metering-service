@@ -1,50 +1,47 @@
 @startuml 04-sequence-signup
-title Sequence - Self-service sign-up, operator approval, key claim
+title Company sign-up
+hide footbox
 skinparam shadowing false
-autonumber
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam sequenceMessageAlign center
+skinparam roundCorner 12
+skinparam ArrowColor #4F46E5
+skinparam ArrowThickness 1.3
+skinparam SequenceLifeLineBorderColor #C7D2FE
+skinparam ParticipantBackgroundColor #EEF2FF
+skinparam ParticipantBorderColor #4F46E5
+skinparam ParticipantFontStyle bold
+skinparam ActorBackgroundColor #EEF2FF
+skinparam ActorBorderColor #4F46E5
+skinparam DatabaseBackgroundColor #EEF2FF
+skinparam DatabaseBorderColor #4F46E5
+skinparam NoteBackgroundColor #FFFBEB
+skinparam NoteBorderColor #F59E0B
+skinparam SequenceGroupBorderColor #94A3B8
+skinparam SequenceGroupHeaderFontColor #334155
+skinparam SequenceDividerBackgroundColor #E0E7FF
+skinparam SequenceDividerBorderColor #4F46E5
+skinparam TitleFontSize 18
 
 actor Applicant
-actor Operator
 participant "Web app" as Web
 participant "API" as API
-database "PostgreSQL" as DB
+actor Operator
 
-Applicant -> Web : fill /signup form\n(company, contact, email, plan)
+Applicant -> Web : fill in the sign-up form
 Web -> API : POST /signup-requests
-API -> DB : INSERT signup_requests\n(status pending, claim code hash)
-API --> Web : 201 { requestId, claimCode (shown once) }
-Web --> Applicant : show request id + claim code
+API --> Applicant : request id + claim code
 
-Applicant -> Web : /signup/status (id + code)
-Web -> API : POST /signup-requests/status
-API -> DB : find by id, compare code hash\n(constant time)
-API --> Web : status: pending
-
-Operator -> Web : Access requests page
-Web -> API : GET /admin/signup-requests (operator JWT)
-API --> Web : list + counts per status
-
-alt approve
-  Operator -> Web : Approve (plan, message)
-  Web -> API : POST /admin/signup-requests/{id}/approve
-  API -> DB : BEGIN; lock request\nINSERT account (placeholder key hash)\nmark approved; COMMIT
-  API --> Web : approved
-  Applicant -> Web : check status, "Get my API key"
-  Web -> API : POST /signup-requests/claim (id + code)
-  API -> DB : BEGIN; lock request\nreplace key hash, mark claimed; COMMIT
-  API --> Web : { account, apiKey (once) }
-  Web -> API : POST /auth/token (the new key)
-  API --> Web : account JWT -> account portal
-else deny
-  Operator -> Web : Deny (reason required)
-  Web -> API : POST /admin/signup-requests/{id}/reject
-  API -> DB : mark rejected (note)
-  Applicant -> Web : check status
-  API --> Web : rejected + operator's reason
+alt approved
+  Operator -> API : approve the request
+  API -> API : create the account
+  Applicant -> API : check status, collect key
+  API --> Applicant : API key (shown once)
+  Applicant -> Web : sign in with the key
+else denied
+  Operator -> API : deny (with a reason)
+  Applicant -> API : check status
+  API --> Applicant : rejected + reason
 end
-
-note over API, DB
-  Wrong claim code and unknown id answer the same 404.
-  One open request per email; one account per request.
-end note
 @enduml

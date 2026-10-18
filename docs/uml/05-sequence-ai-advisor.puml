@@ -1,44 +1,45 @@
 @startuml 05-sequence-ai-advisor
-title Sequence - AI Usage Advisor
+title AI Usage Advisor
+hide footbox
 skinparam shadowing false
-autonumber
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam sequenceMessageAlign center
+skinparam roundCorner 12
+skinparam ArrowColor #4F46E5
+skinparam ArrowThickness 1.3
+skinparam SequenceLifeLineBorderColor #C7D2FE
+skinparam ParticipantBackgroundColor #EEF2FF
+skinparam ParticipantBorderColor #4F46E5
+skinparam ParticipantFontStyle bold
+skinparam ActorBackgroundColor #EEF2FF
+skinparam ActorBorderColor #4F46E5
+skinparam DatabaseBackgroundColor #EEF2FF
+skinparam DatabaseBorderColor #4F46E5
+skinparam NoteBackgroundColor #FFFBEB
+skinparam NoteBorderColor #F59E0B
+skinparam SequenceGroupBorderColor #94A3B8
+skinparam SequenceGroupHeaderFontColor #334155
+skinparam SequenceDividerBackgroundColor #E0E7FF
+skinparam SequenceDividerBorderColor #4F46E5
+skinparam TitleFontSize 18
 
-actor "Operator or company" as User
+actor User
 participant "Web app" as Web
-participant "API /ai/advisor\n(requireAnyRole)" as Route
-participant "AskAdvisorQuery" as Query
-participant "UsageContextBuilder" as Ctx
-database "PostgreSQL" as DB
-participant "AIProvider\n(mock | OpenAI-compatible)" as Provider
-participant "OpenAI / OpenRouter" as LLM <<external>>
+participant "API" as API
+database "Database" as DB
+participant "AI model" as AI
 
 User -> Web : ask a question
-Web -> Route : POST /ai/advisor { question, month }\nBearer JWT
-Route -> Route : rate limit per caller\n(AI_RATE_LIMIT_PER_WINDOW)
-Route -> Query : execute(caller, question)
-alt company (account token / API key)
-  Query -> DB : account usage summary\n(that account only)
-else operator
-  Query -> DB : cross-account analytics\n(per-company requests, rejections)
-end
-Query -> Ctx : build context (aggregates only,\nnames sanitized, size capped)
-Ctx --> Query : context + data points
-Query -> Provider : generateUsageInsight(question, scope, context)
-alt AI_PROVIDER=mock
-  Provider --> Query : deterministic answer from the data
-else AI_PROVIDER=openai
-  Provider -> LLM : chat completion / responses\nstrict JSON schema
-  LLM --> Provider : JSON { summary, highlights, recommendations }
-  Provider -> Provider : validate JSON\n(cut-off / no credit / rate limit -> clear error)
-  Provider --> Query : insight
-end
-Query --> Route : answer + scope + provider + model
-Route --> Web : 200 AiAdvisorResponse
-Web --> User : summary, highlights, recommendations
+Web -> API : POST /ai/advisor
+API -> DB : read usage numbers\n(only what this user may see)
+API -> AI : question + numbers
+AI --> API : summary and advice (JSON)
+API --> Web : answer
+Web --> User : show the answer
 
-note right of LLM
-  The model never queries the database
-  and cannot change anything; it only
-  explains numbers the service computed.
+note over API, AI
+  The AI only explains the numbers.
+  It cannot read or change the database.
 end note
 @enduml

@@ -660,10 +660,10 @@ concurrency sections above embed the most relevant ones.
 | # | Type | Diagram | Shows |
 |---|---|---|---|
 | 01 | Use case | [Use cases](docs/uml/svg/01-use-cases.svg) · [source](docs/uml/01-use-cases.puml) | Actors and what each can do |
-| 02 | Sequence | [Consume units](docs/uml/svg/02-sequence-consume.svg) · [source](docs/uml/02-sequence-consume.puml) | One transaction: advisory lock, idempotency, row locks, evaluation |
-| 03 | Sequence | [JWT authentication](docs/uml/svg/03-sequence-jwt-auth.svg) · [source](docs/uml/03-sequence-jwt-auth.puml) | Sign-in, refresh, reuse detection, reload, sign-out |
+| 02 | Sequence | [Consume units](docs/uml/svg/02-sequence-consume.svg) · [source](docs/uml/02-sequence-consume.puml) | How one request is checked, counted and saved; retries are replayed |
+| 03 | Sequence | [JWT authentication](docs/uml/svg/03-sequence-jwt-auth.svg) · [source](docs/uml/03-sequence-jwt-auth.puml) | Sign-in, using the app, automatic refresh, sign-out |
 | 04 | Sequence | [Sign-up](docs/uml/svg/04-sequence-signup.svg) · [source](docs/uml/04-sequence-signup.puml) | Request, approval or denial, one-time key collection |
-| 05 | Sequence | [AI advisor](docs/uml/svg/05-sequence-ai-advisor.svg) · [source](docs/uml/05-sequence-ai-advisor.puml) | Context building and the provider call |
+| 05 | Sequence | [AI advisor](docs/uml/svg/05-sequence-ai-advisor.svg) · [source](docs/uml/05-sequence-ai-advisor.puml) | Question, usage numbers, AI answer |
 | 06 | Class | [Domain model](docs/uml/svg/06-class-domain.svg) · [source](docs/uml/06-class-domain.puml) | Entities, value objects and the quota policy |
 | 07 | Component | [Architecture](docs/uml/svg/07-component-architecture.svg) · [source](docs/uml/07-component-architecture.puml) | Frontend and backend layers |
 | 08 | Deployment | [Docker Compose](docs/uml/svg/08-deployment.svg) · [source](docs/uml/08-deployment.puml) | Containers, network, volume, ports |
