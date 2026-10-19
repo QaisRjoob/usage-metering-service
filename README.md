@@ -71,7 +71,7 @@ project with Docker Compose, the documentation and the UML diagrams.
 15. [Testing](#-testing)
 16. [Performance](#-performance)
 17. [Local development](#-local-development)
-18. [Deploy to Railway](#-deploy-to-railway)
+18. [Deploy to Render](#-deploy-to-render)
 19. [Product assumptions](#-product-assumptions)
 20. [Design decisions and trade-offs](#-design-decisions-and-trade-offs)
 21. [Known limitations](#-known-limitations)
@@ -630,43 +630,56 @@ contract changes, update `backend/src/contracts` and copy the change to `fronten
 
 ---
 
-## 🚢 Deploy to Railway
+## 🚢 Deploy to Render
 
-The repository root holds two apps, so Railway must not build the root (that fails with
-"Railpack failed to prepare the build"). Create **three services** in one Railway project:
+The [live demo](#-live-demo) runs on Render from the two standalone repositories
+([backend](https://github.com/QaisRjoob/usage-metering-backend),
+[frontend](https://github.com/QaisRjoob/usage-metering-frontend)). To deploy from this repository
+instead, set each service's *Root Directory* to `backend` or `frontend`. Create three resources:
 
-| Service | How to create it | Settings |
+| Resource | Type | Settings |
 |---|---|---|
-| **Postgres** | *New → Database → PostgreSQL* | nothing to change |
-| **api** | *New → GitHub repo* (this repository), then rename it to `api` | *Settings → Root Directory* = `/backend` (the Dockerfile there is used) |
-| **web** | *New → GitHub repo* again, rename it to `web` | *Settings → Root Directory* = `/frontend`; *Networking → Generate Domain* |
+| **Database** | *New → Postgres* | copy its **Internal Database URL** |
+| **Backend** | *New → Web Service*, **Docker** runtime | health check path `/api/v1/ready` (the Dockerfile is used) |
+| **Frontend** | *New → Static Site* | build command `npm ci && npm run build`, publish directory `dist` |
 
-**api variables**
+**Backend variables**
 
 | Variable | Value |
 |---|---|
 | `NODE_ENV` | `production` |
-| `HOST` / `PORT` | `::` / `3000` (listen on Railway's private IPv6 network) |
-| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
-| `ADMIN_API_TOKEN` | a long random value (the operator sign-in) |
-| `JWT_SECRET` | a long random value, at least 32 characters |
-| `COOKIE_SECURE` | `true` (Railway serves HTTPS) |
-| `TRUST_PROXY_HOPS` | `1` (believe the client address sent by the web service) |
+| `DATABASE_URL` | the database's Internal Database URL |
+| `ADMIN_API_TOKEN` | *Generate* (the operator sign-in) |
+| `JWT_SECRET` | *Generate* (at least 32 characters) |
+| `COOKIE_SECURE` | `true` (Render serves HTTPS) |
+| `TRUST_PROXY_HOPS` | `2` (Render's edge plus the frontend's `/api` rewrite) |
 | `SEED_DEMO_DATA` | `true` for a public demo with the demo company, `false` otherwise |
 | `AI_PROVIDER`, `OPENAI_*` | optional, see [AI Usage Advisor](#-ai-usage-advisor) |
 
-**web variables**
+Render sets `PORT`.
+
+**Frontend variables** (Vite bakes them in at build time)
 
 | Variable | Value |
 |---|---|
-| `API_UPSTREAM` | `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:3000` |
-| `REAL_IP_FROM` / `REAL_IP_FROM_V6` | `0.0.0.0/0` / `::/0` (believe Railway's edge proxy) |
+| `NODE_VERSION` | `22` |
+| `VITE_DATA_SOURCE` | `api` |
+| `VITE_API_BASE_URL` | `/api/v1` |
 | `VITE_DEMO_API_KEY` | `umk_demo_local_only_do_not_use_in_production` only when the demo data is seeded (shows the demo company test account) |
-| `VITE_DEMO_OPERATOR_TOKEN` | optional: the api's `ADMIN_API_TOKEN` value, to show an operator test account. Anyone who opens the site can then act as operator, so use it only for a demo |
+| `VITE_DEMO_OPERATOR_TOKEN` | optional: the backend's `ADMIN_API_TOKEN` value, to show an operator test account. Anyone who opens the site can then act as operator, so use it only for a demo |
 
-Only the web service gets a public domain; the API is reached through it at `/api`, so no CORS
-setup is needed. Railway sets `PORT` for the web service and nginx listens on it. Generate the
-secrets with `openssl rand -base64 48`.
+**Frontend Redirects/Rewrites**, in this order:
+
+| Source | Destination | Action |
+|---|---|---|
+| `/api/*` | `https://usage-metering-backend.onrender.com/api/*` | Rewrite |
+| `/*` | `/index.html` | Rewrite |
+
+The first rule keeps API calls on the frontend's own origin, so no CORS setup is needed and the
+`SameSite=Strict` refresh cookie works; the second serves the single-page app for every route.
+
+On any Docker host, the frontend's Docker image (nginx, with `API_UPSTREAM` pointing at the backend)
+does the same proxying, as in `docker compose`.
 
 ---
 
