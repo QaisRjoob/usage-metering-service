@@ -16,6 +16,8 @@ explains rejections, and stays correct under retries and concurrent traffic.
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
 
+**[🌐 Live demo](https://usage-metering-frontend-w270.onrender.com)** ·
+[API docs](https://usage-metering-backend.onrender.com/docs) ·
 [Quick start](#-quick-start) ·
 [Architecture](#-architecture) ·
 [API](#-api) ·
@@ -24,6 +26,29 @@ explains rejections, and stays correct under retries and concurrent traffic.
 [User guide](docs/USER_GUIDE.md)
 
 </div>
+
+---
+
+## 🌐 Live demo
+
+| What | Link |
+|---|---|
+| **Web app** (operator console, company portal, Client Demo) | https://usage-metering-frontend-w270.onrender.com |
+| **API** (base URL `/api/v1`) | https://usage-metering-backend.onrender.com/api/v1 |
+| API docs (Swagger UI) | https://usage-metering-backend.onrender.com/docs |
+| Health check | https://usage-metering-backend.onrender.com/api/v1/ready |
+| Frontend source | https://github.com/QaisRjoob/usage-metering-frontend |
+| Backend source | https://github.com/QaisRjoob/usage-metering-backend |
+
+On the login page, the **Test accounts** box signs you in as the demo company in one click, so you
+can try the portal, the Client Demo and the AI Advisor without creating anything. The sample data is
+shared, so anyone can see and change it.
+
+> Hosted on Render's free plan: after about 15 minutes without traffic the backend sleeps, so the
+> first request can take up to a minute while it wakes up.
+
+The two deployed parts live in their own repositories (above); this repository holds the complete
+project with Docker Compose, the documentation and the UML diagrams.
 
 ---
 
